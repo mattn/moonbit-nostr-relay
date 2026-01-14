@@ -153,13 +153,17 @@ All packages are self-contained with minimal dependencies for modularity.
 Code style follows MoonBit conventions with blocks separated by `///|`:
 
 ```moonbit
-///| Block 1 - Implementation
+///|
+/// Block 1 - Implementation
+pub fn function1() -> Type {
+  ...
+}
 
-pub fn function1() -> Type { ... }
-
-///| Block 2 - Related implementation
-
-pub fn function2() -> Type { ... }
+///|
+/// Block 2 - Related implementation
+pub fn function2() -> Type {
+  ...
+}
 ```
 
 Run `moon fmt` to format, `moon check` to validate.

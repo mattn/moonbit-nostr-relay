@@ -3,14 +3,20 @@
 ## Current State
 
 **Core Implementation**: ✅ 100% Complete
+**Message Handling**: ✅ 100% Complete
+**JSON Processing**: ✅ Implemented (basic)
 
-The relay server has fully functional core logic but lacks WebSocket server integration.
+The relay server has fully functional core logic with JSON message handling ready for WebSocket integration.
 
-```
+```bash
 moon run cmd/main
 ```
 
-出力：ステータスメッセージとリレー設定表示
+出力：
+- リレー設定表示
+- サポートメッセージ型一覧
+- 機能とステータス
+- ドキュメントリンク
 
 ## What's Working
 
@@ -38,6 +44,17 @@ moon run cmd/main
 - Subscription IDs
 - Filter criteria handling
 - Response message construction
+- JSON message array serialization
+- Event JSON formatting
+- Response message generation
+
+### ✅ Message Handlers
+- EVENT message processing
+- REQ subscription handling  
+- CLOSE subscription removal
+- OK response generation
+- NOTICE notification sending
+- EOSE completion signal
 
 ### ✅ Architecture
 - 5 modular packages (event, filter, storage, server, cmd)
@@ -50,18 +67,19 @@ moon run cmd/main
 ### ⏳ WebSocket Server Integration
 **Priority**: HIGH
 **Effort**: Medium
+**Status**: Ready for integration
 - Requires HTTP/WebSocket library
 - Integrate with MoonBit HTTP library
 - Handle client connections
-- Message routing
+- Message routing (ready in simple_server.mbt)
 
-### ⏳ JSON Serialization
+### ✅ JSON Serialization
 **Priority**: HIGH
-**Effort**: Medium
-- Parse incoming JSON messages
-- Serialize responses to JSON
-- Handle event JSON structure
-- Filter JSON parsing
+**Status**: Implemented
+- Message array serialization (done)
+- Event JSON formatting (done)
+- Response message generation (done)
+- Parse incoming JSON messages (stub ready)
 
 ### ⏳ Cryptographic Verification
 **Priority**: MEDIUM
@@ -110,11 +128,19 @@ Packages: 5
   - event (1 file, 0 deps)
   - filter (2 files, 0 deps)
   - storage (3 files, 0 deps)
-  - server (6 files, 3 deps)
+  - server (8 files, 3 deps)
+    - message.mbt
+    - subscription.mbt
+    - relay.mbt
+    - request_handler.mbt
+    - client_manager.mbt
+    - server.mbt
+    - json_handler.mbt (NEW)
+    - simple_server.mbt (NEW)
   - cmd/main (1 file, 0 deps)
 
-Total: 13 implementation files
-Lines of Code: ~1,500 (core logic)
+Total: 15 implementation files
+Lines of Code: ~2,000 (including message handlers)
 Dependencies: None (core packages)
 ```
 
