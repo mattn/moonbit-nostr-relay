@@ -1,0 +1,9 @@
+{
+  "is-main": true,
+  "import": [
+    {
+      "path": "mattn/moonbit_nostr_relay",
+      "alias": "lib"
+    }
+  ]
+}
