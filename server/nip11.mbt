@@ -5,7 +5,7 @@ pub fn nip11_doc() -> String {
   m.set("name", "moonbit-nostr-relay".to_json())
   m.set("description", "A Nostr relay implemented in MoonBit".to_json())
   m.set("software", "https://github.com/mattn/moonbit-nostr-relay".to_json())
-  m.set("version", "0.1.1".to_json())
+  m.set("version", "0.1.2".to_json())
   m.set(
     "supported_nips",
     ([1.0.to_json(), 11.0.to_json()] : Array[Json]).to_json(),
