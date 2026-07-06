@@ -4,8 +4,6 @@
 
 A working Nostr relay server written in [MoonBit](https://www.moonbitlang.com/), with full NIP-01 message handling and real cryptographic verification (SHA-256 event ids + BIP-340 Schnorr signatures) implemented in pure MoonBit.
 
-A public instance is running at **wss://relay.example.com** (the same URL serves the landing page and the NIP-11 document over HTTPS).
-
 ## Quick Start
 
 ### Docker (recommended)
