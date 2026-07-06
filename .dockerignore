@@ -6,3 +6,4 @@ target
 !README.mbt.md
 Dockerfile
 .dockerignore
+kustomize/
