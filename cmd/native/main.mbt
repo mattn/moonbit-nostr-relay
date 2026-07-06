@@ -47,6 +47,13 @@ async fn main {
     }
   }
   let web_root = @env.get_env_var("WEB_ROOT").unwrap_or("public")
+  let nip11 = @server.nip11_doc(
+    name?=@env.get_env_var("RELAY_NAME"),
+    description?=@env.get_env_var("RELAY_DESCRIPTION"),
+    pubkey?=@env.get_env_var("RELAY_PUBKEY"),
+    contact?=@env.get_env_var("RELAY_CONTACT"),
+    icon?=@env.get_env_var("RELAY_ICON"),
+  )
   let relay = @server.Relay::new(config, store)
   // client id -> outgoing message queue, drained by a per-client writer task
   let outboxes : Map[String, @aqueue.Queue[String]] = {}
@@ -66,7 +73,7 @@ async fn main {
           "Access-Control-Allow-Origin": "*",
         }
         conn.send_response(200, "OK", extra_headers=headers)
-        conn.write_string(@server.nip11_doc())
+        conn.write_string(nip11)
         conn.end_response()
       } else {
         serve_static(conn, request.path, web_root)

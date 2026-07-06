@@ -1,11 +1,26 @@
 ///|
 /// NIP-11 relay information document
-pub fn nip11_doc() -> String {
+pub fn nip11_doc(
+  name? : String = "moonbit-nostr-relay",
+  description? : String = "A Nostr relay implemented in MoonBit",
+  pubkey? : String = "",
+  contact? : String = "",
+  icon? : String = "",
+) -> String {
   let m : Map[String, Json] = {}
-  m.set("name", "moonbit-nostr-relay".to_json())
-  m.set("description", "A Nostr relay implemented in MoonBit".to_json())
+  m.set("name", name.to_json())
+  m.set("description", description.to_json())
+  if pubkey != "" {
+    m.set("pubkey", pubkey.to_json())
+  }
+  if contact != "" {
+    m.set("contact", contact.to_json())
+  }
+  if icon != "" {
+    m.set("icon", icon.to_json())
+  }
   m.set("software", "https://github.com/mattn/moonbit-nostr-relay".to_json())
-  m.set("version", "0.1.2".to_json())
+  m.set("version", "0.1.3".to_json())
   m.set(
     "supported_nips",
     ([1.0.to_json(), 11.0.to_json()] : Array[Json]).to_json(),
