@@ -1,0 +1,8 @@
+.git
+_build
+target
+.mooncakes
+*.md
+!README.mbt.md
+Dockerfile
+.dockerignore
