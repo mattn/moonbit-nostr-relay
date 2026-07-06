@@ -2,9 +2,17 @@
 
 ///|
 
-///| Implements the @storage.Storage trait so the relay engine is unaware
+///| Schema and query semantics are compatible with
 
-///| of the backend.
+///| github.com/fiatjaf/eventstore/postgresql, so this relay can run on a
+
+///| database created by khatru/eventstore-based relays and vice versa:
+
+///| same `event` table, `tags_to_tagvalues` generated column, indexes,
+
+///| `tagvalues && ARRAY[...]` tag matching and the default query limit
+
+///| of 100.
 
 ///|
 
@@ -12,13 +20,9 @@
 
 ///| with recent moonc value layouts (params arrive as NULL), so all values
 
-///| are inlined as properly escaped SQL literals and sent via
+///| are inlined as ASCII-only E'...' literals and sent via
 
-///| Connection::query. quote_str doubles single quotes and strips NUL;
-
-///| with standard_conforming_strings (PostgreSQL default) that is a
-
-///| complete escape for string literals.
+///| Connection::query; see quote_str/fix_utf8 below.
 
 ///|
 pub struct PgStore {
@@ -26,24 +30,37 @@ pub struct PgStore {
 }
 
 ///|
+/// Matches eventstore/postgresql's default QueryLimit
+let query_limit : Int = 100
+
+///|
 let schema : Array[String] = [
   (
-    #|CREATE TABLE IF NOT EXISTS events (
-    #|  id TEXT PRIMARY KEY,
-    #|  pubkey TEXT NOT NULL,
-    #|  created_at BIGINT NOT NULL,
-    #|  kind INTEGER NOT NULL,
-    #|  tags JSONB NOT NULL,
-    #|  content TEXT NOT NULL,
-    #|  sig TEXT NOT NULL,
-    #|  d_tag TEXT NOT NULL DEFAULT ''
+    #|CREATE OR REPLACE FUNCTION tags_to_tagvalues(jsonb) RETURNS text[]
+    #|    AS 'SELECT COALESCE(array_agg((t->>0) || '':'' || (t->>1)), ''{}''::text[]) FROM (SELECT jsonb_array_elements($1) AS t)s WHERE length(t->>0) = 1;'
+    #|    LANGUAGE SQL
+    #|    IMMUTABLE
+    #|    RETURNS NULL ON NULL INPUT
+  ),
+  (
+    #|CREATE TABLE IF NOT EXISTS event (
+    #|  id text NOT NULL,
+    #|  pubkey text NOT NULL,
+    #|  created_at integer NOT NULL,
+    #|  kind integer NOT NULL,
+    #|  tags jsonb NOT NULL,
+    #|  content text NOT NULL,
+    #|  sig text NOT NULL,
+    #|
+    #|  tagvalues text[] GENERATED ALWAYS AS (tags_to_tagvalues(tags)) STORED
     #|)
   ),
-  "CREATE INDEX IF NOT EXISTS events_pubkey_idx ON events(pubkey)",
-  "CREATE INDEX IF NOT EXISTS events_kind_idx ON events(kind)",
-  "CREATE INDEX IF NOT EXISTS events_created_at_idx ON events(created_at DESC)",
-  "CREATE INDEX IF NOT EXISTS events_replace_idx ON events(pubkey, kind, d_tag)",
-  "CREATE INDEX IF NOT EXISTS events_tags_idx ON events USING GIN(tags)",
+  "CREATE UNIQUE INDEX IF NOT EXISTS ididx ON event USING btree (id text_pattern_ops)",
+  "CREATE INDEX IF NOT EXISTS pubkeyprefix ON event USING btree (pubkey text_pattern_ops)",
+  "CREATE INDEX IF NOT EXISTS timeidx ON event (created_at DESC)",
+  "CREATE INDEX IF NOT EXISTS kindidx ON event (kind)",
+  "CREATE INDEX IF NOT EXISTS kindtimeidx ON event(kind,created_at DESC)",
+  "CREATE INDEX IF NOT EXISTS arbitrarytagvalues ON event USING gin (tagvalues)",
 ]
 
 ///|
@@ -130,7 +147,7 @@ fn to_hex8(u : Int) -> String {
 
 ///|
 /// Repair strings read back through the libpq binding, which maps each
-/// UTF-8 byte to one UTF-16 code unit. Reassemble the bytes and decode.
+/// UTF-8 byte to one UTF-16 code unit (sign-extended for bytes >= 0x80).
 fn fix_utf8(s : String) -> String {
   let bytes : Array[Int] = []
   let mut needs_fix = false
@@ -187,40 +204,33 @@ fn fix_utf8(s : String) -> String {
 }
 
 ///|
-/// SQL literal for a text[] value
-fn text_array(values : Array[String]) -> String {
+/// "a IN ('x','y')" style condition from string values
+fn in_list(column : String, values : Array[String]) -> String {
   let sb = StringBuilder::new()
-  sb.write_string("{")
+  sb.write_string(column)
+  sb.write_string(" IN (")
   for i, v in values {
     if i > 0 {
       sb.write_string(",")
     }
-    sb.write_string("\"")
-    for c in v {
-      match c {
-        '"' => sb.write_string("\\\"")
-        '\\' => sb.write_string("\\\\")
-        '\u{00}' => ()
-        _ => sb.write_char(c)
-      }
-    }
-    sb.write_string("\"")
+    sb.write_string(quote_str(v))
   }
-  sb.write_string("}")
-  quote_str(sb.to_string()) + "::text[]"
+  sb.write_string(")")
+  sb.to_string()
 }
 
 ///|
-fn int_array(values : Array[UInt]) -> String {
+/// tagvalues && ARRAY['name:v1','name:v2'] — the eventstore tag condition
+fn tag_condition(name : String, values : Array[String]) -> String {
   let sb = StringBuilder::new()
-  sb.write_string("'{")
+  sb.write_string("tagvalues && ARRAY[")
   for i, v in values {
     if i > 0 {
       sb.write_string(",")
     }
-    sb.write_string(v.to_string())
+    sb.write_string(quote_str(name + ":" + v))
   }
-  sb.write_string("}'::int[]")
+  sb.write_string("]")
   sb.to_string()
 }
 
@@ -261,12 +271,9 @@ fn row_to_event(row : Array[String]) -> Result[@event.Event, String] {
 }
 
 ///|
-fn PgStore::insert(
-  self : PgStore,
-  ev : @event.Event,
-  d_tag : String,
-) -> Result[Unit, String] {
-  let sql = "INSERT INTO events (id, pubkey, created_at, kind, tags, content, sig, d_tag) VALUES (" +
+/// INSERT ... ON CONFLICT (id) DO NOTHING; false means duplicate
+fn PgStore::insert(self : PgStore, ev : @event.Event) -> Result[Bool, String] {
+  let sql = "INSERT INTO event (id, pubkey, created_at, kind, tags, content, sig) VALUES (" +
     quote_str(ev.id) +
     ", " +
     quote_str(ev.pubkey) +
@@ -280,13 +287,12 @@ fn PgStore::insert(
     quote_str(ev.content) +
     ", " +
     quote_str(ev.sig) +
-    ", " +
-    quote_str(d_tag) +
     ") ON CONFLICT (id) DO NOTHING"
   match self.run(sql) {
     Ok(r) => {
+      let stored = r.affected_rows() > 0
       r.free()
-      Ok(())
+      Ok(stored)
     }
     Err(e) => Err(e)
   }
@@ -294,54 +300,60 @@ fn PgStore::insert(
 
 ///|
 pub impl @storage.Storage for PgStore with fn add(self, ev) {
-  // Exact duplicate?
-  match self.run("SELECT 1 FROM events WHERE id = " + quote_str(ev.id)) {
-    Ok(r) => {
-      let dup = r.rows().length() > 0
-      r.free()
-      if dup {
-        return Duplicate
-      }
-    }
-    Err(e) => return Failed(e)
-  }
   let replaceable = @event.is_replaceable_kind(ev.kind)
   let addressable = @event.is_addressable_kind(ev.kind)
-  let d_tag = if addressable { ev.d_tag() } else { "" }
   if replaceable || addressable {
-    // Keep only the latest event per (pubkey, kind, d_tag)
-    let key_cond = "pubkey = " +
+    // Same approach as eventstore's ReplaceEvent: fetch the current
+    // event for this key, keep only the newest (lowest id on ties)
+    let mut cond = "pubkey = " +
       quote_str(ev.pubkey) +
       " AND kind = " +
-      ev.kind.to_string() +
-      " AND d_tag = " +
-      quote_str(d_tag)
-    match self.run("SELECT created_at, id FROM events WHERE " + key_cond) {
+      ev.kind.to_string()
+    if addressable {
+      cond = cond + " AND " + tag_condition("d", [ev.d_tag()])
+    }
+    match
+      self.run(
+        "SELECT id, created_at FROM event WHERE " +
+        cond +
+        " ORDER BY created_at DESC, id",
+      ) {
       Ok(r) => {
         let rows = r.rows()
         let mut stale = false
+        let older_ids : Array[String] = []
         for row in rows {
-          let existing_created = @strconv.parse_uint64(row[0]) catch { _ => 0 }
+          if row[0] == ev.id {
+            r.free()
+            return Duplicate
+          }
+          let existing_created = @strconv.parse_uint64(row[1]) catch { _ => 0 }
           // On equal timestamps NIP-01 keeps the event with the lowest id
           if existing_created > ev.created_at ||
-            (existing_created == ev.created_at && row[1] < ev.id) {
+            (existing_created == ev.created_at && row[0] < ev.id) {
             stale = true
+          } else {
+            older_ids.push(row[0])
           }
         }
         r.free()
         if stale {
           return Stale
         }
-        match self.run("DELETE FROM events WHERE " + key_cond) {
-          Ok(r) => r.free()
-          Err(e) => return Failed(e)
+        if older_ids.length() > 0 {
+          match
+            self.run("DELETE FROM event WHERE " + in_list("id", older_ids)) {
+            Ok(r) => r.free()
+            Err(e) => return Failed(e)
+          }
         }
       }
       Err(e) => return Failed(e)
     }
   }
-  match self.insert(ev, d_tag) {
-    Ok(_) => Added
+  match self.insert(ev) {
+    Ok(true) => Added
+    Ok(false) => Duplicate
     Err(e) => Failed(e)
   }
 }
@@ -350,13 +362,30 @@ pub impl @storage.Storage for PgStore with fn add(self, ev) {
 pub impl @storage.Storage for PgStore with fn query(self, f) {
   let conds : Array[String] = []
   if f.ids.length() > 0 {
-    conds.push("id = ANY(" + text_array(f.ids) + ")")
+    conds.push(in_list("id", f.ids))
   }
   if f.authors.length() > 0 {
-    conds.push("pubkey = ANY(" + text_array(f.authors) + ")")
+    conds.push(in_list("pubkey", f.authors))
   }
   if f.kinds.length() > 0 {
-    conds.push("kind = ANY(" + int_array(f.kinds) + ")")
+    let sb = StringBuilder::new()
+    sb.write_string("kind IN (")
+    for i, k in f.kinds {
+      if i > 0 {
+        sb.write_string(",")
+      }
+      sb.write_string(k.to_string())
+    }
+    sb.write_string(")")
+    conds.push(sb.to_string())
+  }
+  for tf in f.tags {
+    if tf.values.length() == 0 {
+      // eventstore rejects empty tag sets; match nothing
+      conds.push("false")
+    } else {
+      conds.push(tag_condition(tf.name, tf.values))
+    }
   }
   match f.since {
     Some(since) => conds.push("created_at >= " + since.to_string())
@@ -366,39 +395,25 @@ pub impl @storage.Storage for PgStore with fn query(self, f) {
     Some(until) => conds.push("created_at <= " + until.to_string())
     None => ()
   }
-  for tf in f.tags {
-    if tf.values.length() == 0 {
-      conds.push(
-        "EXISTS (SELECT 1 FROM jsonb_array_elements(tags) t WHERE t->>0 = " +
-        quote_str(tf.name) +
-        ")",
-      )
-    } else {
-      conds.push(
-        "EXISTS (SELECT 1 FROM jsonb_array_elements(tags) t WHERE t->>0 = " +
-        quote_str(tf.name) +
-        " AND t->>1 = ANY(" +
-        text_array(tf.values) +
-        "))",
-      )
-    }
+  if conds.length() == 0 {
+    conds.push("true")
+  }
+  // eventstore caps every query at QueryLimit (default 100)
+  let limit = match f.limit {
+    Some(l) => if l < 1 || l > query_limit { query_limit } else { l }
+    None => query_limit
   }
   let sb = StringBuilder::new()
   sb.write_string(
-    "SELECT id, pubkey, created_at, kind, tags::text, content, sig FROM events",
+    "SELECT id, pubkey, created_at, kind, tags::text, content, sig FROM event WHERE ",
   )
   for i, cond in conds {
-    sb.write_string(if i == 0 { " WHERE " } else { " AND " })
+    if i > 0 {
+      sb.write_string(" AND ")
+    }
     sb.write_string(cond)
   }
-  sb.write_string(" ORDER BY created_at DESC, id ASC")
-  match f.limit {
-    Some(limit) => {
-      let n = if limit < 0 { 0 } else { limit }
-      sb.write_string(" LIMIT \{n}")
-    }
-    None => ()
-  }
+  sb.write_string(" ORDER BY created_at DESC, id LIMIT \{limit}")
   let result : Array[@event.Event] = []
   match self.run(sb.to_string()) {
     Ok(r) => {
@@ -417,7 +432,7 @@ pub impl @storage.Storage for PgStore with fn query(self, f) {
 
 ///|
 pub impl @storage.Storage for PgStore with fn count(self) {
-  match self.run("SELECT count(*) FROM events") {
+  match self.run("SELECT count(*) FROM event") {
     Ok(r) => {
       let rows = r.rows()
       let n = if rows.length() > 0 {

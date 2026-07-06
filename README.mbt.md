@@ -67,7 +67,9 @@ moon info && moon fmt
   validated against official test vectors
 - **Storage backends**: PostgreSQL (durable, via mattn/postgres) or in-memory,
   selected at startup; duplicate detection, replaceable (kind 0/3/1xxxx),
-  addressable (3xxxx, d-tag) and ephemeral (2xxxx) kinds
+  addressable (3xxxx, d-tag) and ephemeral (2xxxx) kinds. The PostgreSQL
+  schema is compatible with [fiatjaf/eventstore](https://github.com/fiatjaf/eventstore)'s
+  postgresql driver, so an existing khatru/eventstore database can be reused as-is
 - **NIP-11**: relay information document
 - **Transport**: minimal RFC 6455 WebSocket server as inline JS FFI over `node:http`
   (no external dependencies)
