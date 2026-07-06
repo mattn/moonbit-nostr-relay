@@ -30,10 +30,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && useradd --system --no-create-home relay
 
 COPY --from=build /app/_build/native/release/build/cmd/native/native.exe /usr/local/bin/nostr-relay
+COPY public /app/public
 
 USER relay
 ENV HOST=0.0.0.0 \
-    PORT=8080
+    PORT=8080 \
+    WEB_ROOT=/app/public
 EXPOSE 8080
 
 # Set DATABASE_URL (postgres://user:pass@host:port/db) for PostgreSQL storage;

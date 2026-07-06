@@ -46,6 +46,7 @@ async fn main {
       @storage.new_store(config.max_events) as &@storage.Storage
     }
   }
+  let web_root = @env.get_env_var("WEB_ROOT").unwrap_or("public")
   let relay = @server.Relay::new(config, store)
   // client id -> outgoing message queue, drained by a per-client writer task
   let outboxes : Map[String, @aqueue.Queue[String]] = {}
@@ -66,11 +67,10 @@ async fn main {
         }
         conn.send_response(200, "OK", extra_headers=headers)
         conn.write_string(@server.nip11_doc())
+        conn.end_response()
       } else {
-        conn.send_response(200, "OK")
-        conn.write_string("This is a Nostr relay. Connect via WebSocket.\n")
+        serve_static(conn, request.path, web_root)
       }
-      conn.end_response()
       return
     }
     let ws = @websocket.from_http_server(request, conn)
@@ -112,4 +112,87 @@ async fn main {
       _ => ()
     }
   })
+}
+
+///|
+fn strip_query(p : String) -> String {
+  let sb = StringBuilder::new()
+  for c in p {
+    if c == '?' || c == '#' {
+      break
+    }
+    sb.write_char(c)
+  }
+  sb.to_string()
+}
+
+///|
+fn content_type(path : String) -> String {
+  if path.has_suffix(".html") || path.has_suffix(".htm") {
+    "text/html; charset=utf-8"
+  } else if path.has_suffix(".js") || path.has_suffix(".mjs") {
+    "text/javascript; charset=utf-8"
+  } else if path.has_suffix(".css") {
+    "text/css; charset=utf-8"
+  } else if path.has_suffix(".json") {
+    "application/json"
+  } else if path.has_suffix(".png") {
+    "image/png"
+  } else if path.has_suffix(".jpg") || path.has_suffix(".jpeg") {
+    "image/jpeg"
+  } else if path.has_suffix(".gif") {
+    "image/gif"
+  } else if path.has_suffix(".svg") {
+    "image/svg+xml"
+  } else if path.has_suffix(".ico") {
+    "image/x-icon"
+  } else if path.has_suffix(".webp") {
+    "image/webp"
+  } else if path.has_suffix(".woff2") {
+    "font/woff2"
+  } else if path.has_suffix(".txt") {
+    "text/plain; charset=utf-8"
+  } else {
+    "application/octet-stream"
+  }
+}
+
+///|
+/// Serve a file from web_root ("/" maps to index.html). Falls back to a
+/// plain-text banner for "/" when no site is installed, 404 otherwise.
+async fn serve_static(
+  conn : @http.ServerConnection,
+  raw_path : String,
+  web_root : String,
+) -> Unit {
+  let mut path = strip_query(raw_path)
+  if path == "" || path == "/" {
+    path = "/index.html"
+  }
+  if path.contains("..") || path.contains("\\") {
+    conn.send_response(404, "Not Found")
+    conn.write_string("not found\n")
+    conn.end_response()
+    return
+  }
+  let data = @fs.read_file(web_root + path) catch {
+    _ => {
+      if path == "/index.html" {
+        conn.send_response(200, "OK")
+        conn.write_string("This is a Nostr relay. Connect via WebSocket.\n")
+      } else {
+        conn.send_response(404, "Not Found")
+        conn.write_string("not found\n")
+      }
+      conn.end_response()
+      return
+    }
+  }
+  let headers : Map[String, String] = {
+    "Content-Type": content_type(path),
+    "Cache-Control": "public, max-age=300",
+  }
+  conn.send_response(200, "OK", extra_headers=headers)
+  conn.write(data)
+  conn.end_response()
 }
