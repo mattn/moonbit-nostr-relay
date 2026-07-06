@@ -1,0 +1,3 @@
+import {
+  "mattn/moonbit_nostr_relay/event",
+}

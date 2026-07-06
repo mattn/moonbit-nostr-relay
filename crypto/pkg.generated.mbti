@@ -1,0 +1,30 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mattn/moonbit_nostr_relay/crypto"
+
+// Values
+pub fn bytes_to_hex(Array[Int]) -> String
+
+pub fn hex_to_bytes(String) -> Result[Array[Int], String]
+
+pub fn pubkey_from_seckey(String) -> Result[String, String]
+
+pub fn schnorr_sign(String, Array[Int], Array[Int]) -> Result[String, String]
+
+pub fn schnorr_verify(String, Array[Int], String) -> Bool
+
+pub fn sha256(Array[Int]) -> Array[Int]
+
+pub fn sha256_hex(Array[Int]) -> String
+
+pub fn tagged_hash(String, Array[Int]) -> Array[Int]
+
+pub fn utf8_bytes(String) -> Array[Int]
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

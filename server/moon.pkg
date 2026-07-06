@@ -1,0 +1,7 @@
+import {
+  "moonbitlang/core/json",
+  "mattn/moonbit_nostr_relay/event",
+  "mattn/moonbit_nostr_relay/filter",
+  "mattn/moonbit_nostr_relay/storage",
+  "mattn/moonbit_nostr_relay/crypto",
+}

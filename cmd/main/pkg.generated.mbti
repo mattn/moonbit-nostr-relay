@@ -1,0 +1,18 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mattn/moonbit_nostr_relay/cmd/main"
+
+import {
+  "mattn/moonbit_nostr_relay/server",
+}
+
+// Values
+pub fn serve(@server.Config) -> Unit
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

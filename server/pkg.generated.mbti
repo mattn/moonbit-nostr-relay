@@ -1,0 +1,55 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mattn/moonbit_nostr_relay/server"
+
+import {
+  "mattn/moonbit_nostr_relay/event",
+  "mattn/moonbit_nostr_relay/filter",
+  "mattn/moonbit_nostr_relay/storage",
+}
+
+// Values
+pub fn closed(String, String) -> String
+
+pub fn default_config() -> Config
+
+pub fn eose(String) -> String
+
+pub fn event_msg(String, @event.Event) -> String
+
+pub fn nip11_doc() -> String
+
+pub fn notice(String) -> String
+
+pub fn ok_msg(String, Bool, String) -> String
+
+pub fn verify_event(@event.Event, Bool) -> Result[Unit, String]
+
+// Errors
+
+// Types and methods
+pub(all) struct Config {
+  host : String
+  port : Int
+  max_events : Int
+  verify_sigs : Bool
+}
+
+pub struct Outgoing {
+  client_id : String
+  message : String
+}
+
+pub struct Relay {
+  config : Config
+  store : &@storage.Storage
+  subs : Map[String, Map[String, Array[@filter.Filter]]]
+}
+pub fn Relay::client_disconnected(Self, String) -> Unit
+pub fn Relay::handle_message(Self, String, String) -> Array[Outgoing]
+pub fn Relay::new(Config, &@storage.Storage) -> Self
+pub fn Relay::stats(Self) -> String
+
+// Type aliases
+
+// Traits
+

@@ -1,0 +1,39 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mattn/moonbit_nostr_relay/storage"
+
+import {
+  "mattn/moonbit_nostr_relay/event",
+  "mattn/moonbit_nostr_relay/filter",
+}
+
+// Values
+pub fn new_store(Int) -> EventStore
+
+// Errors
+
+// Types and methods
+pub(all) enum AddOutcome {
+  Added
+  Duplicate
+  Stale
+  Failed(String)
+}
+
+pub struct EventStore {
+  events : Array[@event.Event]
+  max_events : Int
+}
+pub fn EventStore::add(Self, @event.Event) -> AddOutcome
+pub fn EventStore::count(Self) -> Int
+pub fn EventStore::query(Self, @filter.Filter) -> Array[@event.Event]
+pub impl Storage for EventStore
+
+// Type aliases
+
+// Traits
+pub(open) trait Storage {
+  fn add(Self, @event.Event) -> AddOutcome
+  fn query(Self, @filter.Filter) -> Array[@event.Event]
+  fn count(Self) -> Int
+}
+

@@ -1,0 +1,37 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mattn/moonbit_nostr_relay/filter"
+
+import {
+  "mattn/moonbit_nostr_relay/event",
+}
+
+// Values
+pub fn new() -> Filter
+
+pub fn new_tag_filter(String, Array[String]) -> TagFilter
+
+// Errors
+
+// Types and methods
+pub struct Filter {
+  ids : Array[String]
+  authors : Array[String]
+  kinds : Array[UInt]
+  since : UInt64?
+  until : UInt64?
+  limit : Int?
+  tags : Array[TagFilter]
+}
+pub fn Filter::from_json(Json) -> Result[Self, String]
+pub fn Filter::matches(Self, @event.Event) -> Bool
+
+pub struct TagFilter {
+  name : String
+  values : Array[String]
+}
+pub fn TagFilter::matches(Self, Array[Array[String]]) -> Bool
+
+// Type aliases
+
+// Traits
+

@@ -1,147 +1,106 @@
 ///|
-/// In-memory event storage for Nostr relay
-pub struct StoredEvent {
-  id : String
-  pubkey : String
-  created_at : UInt64
-  kind : UInt
-  tags : Array[Array[String]]
-  content : String
-  sig : String
-}
-
-///|
+/// In-memory event storage for the Nostr relay
 pub struct EventStore {
-  events : Array[StoredEvent]
-  max_events : UInt
+  events : Array[@event.Event]
+  max_events : Int
 }
 
 ///|
-/// Create a new event store with max capacity
-pub fn new_store(max_events : UInt) -> EventStore {
+pub(all) enum AddOutcome {
+  Added // stored (possibly replacing an older replaceable event)
+  Duplicate // already have this exact event id
+  Stale // a newer replaceable/addressable event exists for this key
+  Failed(String) // storage backend error
+}
+
+///|
+pub fn new_store(max_events : Int) -> EventStore {
   { events: [], max_events }
 }
 
 ///|
-/// Add event to store, removing oldest if at capacity
-pub fn add_event(store : EventStore, event : StoredEvent) -> EventStore {
-  let events = store.events
-  if events.length() >= store.max_events.reinterpret_as_int() {
-    // Remove oldest event (first one)
-    let new_events = []
-    for i = 1; i < events.length(); i = i + 1 {
-      new_events.push(events[i])
+fn find_index(store : EventStore, pred : (@event.Event) -> Bool) -> Int {
+  for i, ev in store.events {
+    if pred(ev) {
+      return i
     }
-    { events: new_events, max_events: store.max_events }
+  }
+  -1
+}
+
+///|
+/// Add an event to the store, honouring NIP-01 storage semantics for
+/// replaceable and addressable kinds. Ephemeral events must not be passed
+/// here (the relay layer broadcasts them without storing).
+pub fn EventStore::add(self : EventStore, ev : @event.Event) -> AddOutcome {
+  if find_index(self, fn(e) { e.id == ev.id }) >= 0 {
+    return Duplicate
+  }
+  let replace_idx = if @event.is_replaceable_kind(ev.kind) {
+    find_index(self, fn(e) { e.pubkey == ev.pubkey && e.kind == ev.kind })
+  } else if @event.is_addressable_kind(ev.kind) {
+    let d = ev.d_tag()
+    find_index(self, fn(e) {
+      e.pubkey == ev.pubkey && e.kind == ev.kind && e.d_tag() == d
+    })
   } else {
-    events.push(event)
-    store
+    -1
   }
+  if replace_idx >= 0 {
+    let existing = self.events[replace_idx]
+    // On equal timestamps NIP-01 keeps the event with the lowest id
+    if existing.created_at > ev.created_at ||
+      (existing.created_at == ev.created_at && existing.id < ev.id) {
+      return Stale
+    }
+    let _ = self.events.remove(replace_idx)
+  }
+  if self.events.length() >= self.max_events {
+    let _ = self.events.remove(0)
+  }
+  self.events.push(ev)
+  Added
 }
 
 ///|
-/// Get event by ID
-pub fn get_event(store : EventStore, id : String) -> StoredEvent? {
-  for i = 0; i < store.events.length(); i = i + 1 {
-    if store.events[i].id == id {
-      return Some(store.events[i])
+/// Return events matching the filter, newest first, honouring the
+/// filter's limit when present.
+pub fn EventStore::query(
+  self : EventStore,
+  f : @filter.Filter,
+) -> Array[@event.Event] {
+  let result : Array[@event.Event] = []
+  for ev in self.events {
+    if f.matches(ev) {
+      result.push(ev)
     }
   }
-  None
-}
-
-///|
-/// Find events by author
-pub fn find_by_author(
-  store : EventStore,
-  author : String,
-) -> Array[StoredEvent] {
-  let result = []
-  for i = 0; i < store.events.length(); i = i + 1 {
-    if store.events[i].pubkey == author {
-      result.push(store.events[i])
+  result.sort_by(fn(a, b) {
+    if a.created_at > b.created_at {
+      -1
+    } else if a.created_at < b.created_at {
+      1
+    } else if a.id < b.id {
+      -1
+    } else if a.id > b.id {
+      1
+    } else {
+      0
     }
+  })
+  match f.limit {
+    Some(limit) => {
+      let n = if limit < 0 { 0 } else { limit }
+      if result.length() > n {
+        result.truncate(n)
+      }
+    }
+    None => ()
   }
   result
 }
 
 ///|
-/// Find events by kind
-pub fn find_by_kind(store : EventStore, kind : UInt) -> Array[StoredEvent] {
-  let result = []
-  for i = 0; i < store.events.length(); i = i + 1 {
-    if store.events[i].kind == kind {
-      result.push(store.events[i])
-    }
-  }
-  result
-}
-
-///|
-/// Find events in timestamp range
-pub fn find_by_timestamp(
-  store : EventStore,
-  since : UInt64,
-  until : UInt64,
-) -> Array[StoredEvent] {
-  let result = []
-  for i = 0; i < store.events.length(); i = i + 1 {
-    let event = store.events[i]
-    if event.created_at >= since && event.created_at <= until {
-      result.push(event)
-    }
-  }
-  result
-}
-
-///|
-/// Find all events (ordered by creation time, newest first)
-pub fn find_all(store : EventStore, limit : UInt?) -> Array[StoredEvent] {
-  let max_limit = match limit {
-    Some(l) => l.reinterpret_as_int()
-    None => store.events.length()
-  }
-  let result = []
-  for i = store.events.length() - 1; i >= 0; i = i - 1 {
-    if result.length() >= max_limit {
-      break
-    }
-    result.push(store.events[i])
-  }
-  result
-}
-
-///|
-/// Get total events in store
-pub fn event_count(store : EventStore) -> Int {
-  store.events.length()
-}
-
-///|
-/// Check if event exists
-pub fn has_event(store : EventStore, id : String) -> Bool {
-  for i = 0; i < store.events.length(); i = i + 1 {
-    if store.events[i].id == id {
-      return true
-    }
-  }
-  false
-}
-
-///|
-/// Remove event by ID
-pub fn remove_event(store : EventStore, id : String) -> EventStore {
-  let new_events = []
-  for i = 0; i < store.events.length(); i = i + 1 {
-    if store.events[i].id != id {
-      new_events.push(store.events[i])
-    }
-  }
-  { events: new_events, max_events: store.max_events }
-}
-
-///|
-/// Clear all events
-pub fn clear(store : EventStore) -> EventStore {
-  { events: [], max_events: store.max_events }
+pub fn EventStore::count(self : EventStore) -> Int {
+  self.events.length()
 }

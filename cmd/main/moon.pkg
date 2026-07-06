@@ -1,0 +1,9 @@
+import {
+  "mattn/moonbit_nostr_relay/server",
+  "mattn/moonbit_nostr_relay/storage",
+}
+
+options(
+  "is-main": true,
+  targets: { "serve_js.mbt": [ "js" ], "serve_stub.mbt": [ "not", "js" ] },
+)

@@ -1,0 +1,18 @@
+import {
+  "moonbitlang/core/env",
+  "moonbitlang/core/strconv",
+  "moonbitlang/async",
+  "moonbitlang/async/socket",
+  "moonbitlang/async/http",
+  "moonbitlang/async/websocket",
+  "moonbitlang/async/aqueue",
+  "mattn/moonbit_nostr_relay/server",
+  "mattn/moonbit_nostr_relay/storage",
+  "mattn/moonbit_nostr_relay/pgstore",
+}
+
+supported_targets = "+native"
+
+options(
+  "is-main": true,
+)

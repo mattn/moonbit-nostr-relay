@@ -1,0 +1,48 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "mattn/moonbit_nostr_relay/event"
+
+// Values
+pub fn is_addressable_kind(UInt) -> Bool
+
+pub fn is_ephemeral_kind(UInt) -> Bool
+
+pub fn is_replaceable_kind(UInt) -> Bool
+
+pub let kind_contacts : UInt
+
+pub let kind_encrypted_dm : UInt
+
+pub let kind_event_deletion : UInt
+
+pub let kind_reaction : UInt
+
+pub let kind_recommend_relay : UInt
+
+pub let kind_repost : UInt
+
+pub let kind_set_metadata : UInt
+
+pub let kind_text_note : UInt
+
+// Errors
+
+// Types and methods
+pub(all) struct Event {
+  id : String
+  pubkey : String
+  created_at : UInt64
+  kind : UInt
+  tags : Array[Array[String]]
+  content : String
+  sig : String
+}
+pub fn Event::d_tag(Self) -> String
+pub fn Event::from_json(Json) -> Result[Self, String]
+pub fn Event::serialize_for_id(Self) -> String
+pub fn Event::to_json(Self) -> Json
+pub fn Event::validate(Self) -> Result[Unit, String]
+
+// Type aliases
+
+// Traits
+

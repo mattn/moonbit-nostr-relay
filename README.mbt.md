@@ -1,203 +1,99 @@
 # Moonbit Nostr Relay
 
-A Nostr relay server implementation in MoonBit, providing efficient event storage and subscription management.
+A working Nostr relay server written in [MoonBit](https://www.moonbitlang.com/), with full NIP-01 message handling and real cryptographic verification (SHA-256 event ids + BIP-340 Schnorr signatures) implemented in pure MoonBit.
 
 ## Quick Start
 
-### Build
+### Run the relay (native + PostgreSQL)
+
+The native backend uses moonbitlang/async for the WebSocket transport and
+mattn/postgres (libpq) for storage. Requires libpq (`libpq-dev`).
+
+```bash
+moon build --target native
+DATABASE_URL=postgres://user:pass@localhost:5432/nostr \
+  ./_build/native/debug/build/cmd/native/native.exe
+# listening on ws://0.0.0.0:8080  (PORT / HOST to override)
+```
+
+Without `DATABASE_URL` it falls back to the in-memory store. The schema
+(an `events` table with indexes) is created automatically on startup.
+
+### Run with Docker
+
+```bash
+docker compose up --build
+# relay on ws://localhost:8080, PostgreSQL data in the pgdata volume
+```
+
+Or standalone (in-memory unless DATABASE_URL is set):
+
+```bash
+docker build -t moonbit-nostr-relay .
+docker run -p 8080:8080 -e DATABASE_URL=postgres://... moonbit-nostr-relay
+```
+
+### Run the relay (JS backend, in-memory)
+
+The JS transport runs on Node.js 22+ with no npm dependencies:
+
+```bash
+moon run --target js cmd/main
+# listening on ws://0.0.0.0:8080
+```
+
+Try it with [nak](https://github.com/fiatjaf/nak):
+
+```bash
+nak event -c 'hello' ws://127.0.0.1:8080     # publish (signature is verified)
+nak req -k 1 ws://127.0.0.1:8080             # query stored events
+curl -H 'Accept: application/nostr+json' http://127.0.0.1:8080   # NIP-11 info
+```
+
+### Develop
 
 ```bash
 moon check       # Type check
-moon fmt         # Format code
-moon info        # Update interfaces
+moon test        # Run test suite (relay flows, SHA-256/BIP-340 test vectors)
+moon info && moon fmt
 ```
-
-### Run
-
-```bash
-moon run cmd/main
-```
-
-### Test
-
-```bash
-moon test
-```
-
-See [TESTING.md](TESTING.md) for test examples.
-
-## Architecture
-
-The relay is organized into 5 core packages:
-
-1. **event** - Nostr event types and constants
-2. **filter** - Event filtering logic (ID, author, kind, timestamp)
-3. **storage** - In-memory event store with indexing
-4. **server** - Relay core with subscription management
-5. **cmd** - CLI entry point
-
-See [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) for detailed architecture.
 
 ## Features
 
-- ✅ In-memory event storage with capacity management
-- ✅ Flexible event filtering (multiple criteria)
-- ✅ Subscription management for clients
-- ✅ Nostr protocol message types
-- ⏳ WebSocket server (pending)
-- ⏳ JSON serialization
-- ⏳ Signature verification
+- **NIP-01**: EVENT / REQ / CLOSE handling, OK / EOSE / NOTICE / CLOSED responses,
+  filters (ids, authors, kinds, since, until, limit, `#tag`), live subscription broadcast
+- **Event verification**: NIP-01 canonical serialization → SHA-256 id check, and
+  BIP-340 Schnorr signature verification over secp256k1 — all in pure MoonBit (BigInt),
+  validated against official test vectors
+- **Storage backends**: PostgreSQL (durable, via mattn/postgres) or in-memory,
+  selected at startup; duplicate detection, replaceable (kind 0/3/1xxxx),
+  addressable (3xxxx, d-tag) and ephemeral (2xxxx) kinds
+- **NIP-11**: relay information document
+- **Transport**: minimal RFC 6455 WebSocket server as inline JS FFI over `node:http`
+  (no external dependencies)
 
-## Event Storage
-
-Events are stored in a circular buffer that automatically evicts oldest events when max capacity is reached:
-
-```
-// Create store with 100,000 max events
-let store = new_store(100000)
-
-// Add event
-let event = { id, pubkey, created_at, kind, tags, content, sig }
-let store = add_event(store, event)
-
-// Find events
-let by_author = find_by_author(store, pubkey)
-let by_kind = find_by_kind(store, kind)
-let in_range = find_by_timestamp(store, since, until)
-```
-
-## Filtering
-
-Filter events by multiple criteria:
+## Architecture
 
 ```
-let filter = {
-  ids: ["event_id"],
-  authors: ["author_pubkey"],
-  kinds: [1, 2, 7],
-  since: Some(1000UL),
-  until: Some(2000UL),
-  limit: Some(100),
-}
-
-let matches = match_event(filter, id, author, kind, created_at)
+event/      Event struct, JSON conversion, NIP-01 id serialization, kind classes
+filter/     Filter parsing and matching (incl. tag filters)
+storage/    Storage trait + in-memory store with NIP-01 replacement semantics
+pgstore/    PostgreSQL backend implementing the Storage trait (native only)
+crypto/     SHA-256, BIP-340 Schnorr sign/verify, secp256k1 (pure MoonBit)
+server/     Transport-agnostic relay engine (parse → validate → store → route)
+cmd/native  Native entry point (moonbitlang/async WebSocket + PostgreSQL)
+cmd/main    JS entry point (Node FFI WebSocket, in-memory only)
 ```
 
-## Relay Logic
+The relay engine is transport-agnostic: `Relay::handle_message(client_id, text)`
+returns the list of `(client_id, message)` pairs to deliver, so alternative
+transports (e.g. a native backend socket layer) only need to move strings.
 
-Create and manage subscriptions:
+## Not yet implemented
 
-```
-// Create relay
-let relay = new_relay(config)
-
-// Client sends REQ with filters
-let relay = create_subscription(relay, "sub_id", [filter])
-
-// Find matching events
-let events = find_matching_events(relay, filter, limit)
-
-// Client sends CLOSE
-let relay = remove_subscription(relay, "sub_id")
-```
-
-## Protocol
-
-Implements Nostr NIP-1 with message types:
-
-- `EVENT` - Client sends event to relay
-- `REQ` - Client requests events with filters
-- `CLOSE` - Client closes subscription
-- `EVENT` (server) - Relay sends stored event
-- `EOSE` - End of stored events
-- `OK` - Event acceptance result
-- `NOTICE` - Server message
-
-## Configuration
-
-Default server configuration:
-
-```
-Host: 0.0.0.0
-Port: 8080
-Max Events: 100,000
-Max Connections: 1,000
-```
-
-Customize:
-
-```
-let config = {
-  host: "127.0.0.1",
-  port: 8080,
-  max_connections: 500,
-  max_events: 50000,
-}
-let server = new_server(config)
-```
-
-## Project Layout
-
-```
-event/           - Event types (0 deps)
-filter/          - Filtering logic (0 deps)
-storage/         - Event storage (0 deps)
-server/          - Relay core (3 deps)
-cmd/main/        - CLI entry point
-```
-
-All packages are self-contained with minimal dependencies for modularity.
-
-## Development
-
-Code style follows MoonBit conventions with blocks separated by `///|`:
-
-```moonbit
-///|
-/// Block 1 - Implementation
-pub fn function1() -> Type {
-  ...
-}
-
-///|
-/// Block 2 - Related implementation
-pub fn function2() -> Type {
-  ...
-}
-```
-
-Run `moon fmt` to format, `moon check` to validate.
-
-## Status
-
-**Core Implementation**: ✅ Complete
-- Event storage and retrieval
-- Multi-criteria filtering
-- Subscription management
-- Protocol message types
-
-**Integration**: ⏳ Pending
-- WebSocket server
-- JSON serialization
-- Signature verification
-- Production hardening
-
-## Next Steps
-
-1. WebSocket server integration
-2. JSON message serialization
-3. Signature verification
-4. Comprehensive testing
-5. Performance optimization
-6. Database persistence
-
-See [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) for detailed roadmap.
-
-## References
-
-- [Nostr Protocol](https://github.com/nostr-protocol/nostr)
-- [MoonBit Docs](https://docs.moonbitlang.com)
+- NIP-09 deletion, NIP-42 auth, rate limiting / PoW
+- PostgreSQL on the JS backend (pgstore is native-only)
 
 ## License
 
-Apache 2.0
+Apache-2.0

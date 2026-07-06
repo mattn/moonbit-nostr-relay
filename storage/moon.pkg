@@ -1,0 +1,4 @@
+import {
+  "mattn/moonbit_nostr_relay/event",
+  "mattn/moonbit_nostr_relay/filter",
+}
