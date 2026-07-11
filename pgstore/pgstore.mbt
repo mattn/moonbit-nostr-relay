@@ -271,6 +271,25 @@ fn row_to_event(row : Array[String]) -> Result[@event.Event, String] {
 }
 
 ///|
+/// Value of the first "d" tag in a jsonb `tags` column text, or "" if
+/// absent. Mirrors @event.Event::d_tag so addressable-event replacement in
+/// this backend keys on the same address as the in-memory store.
+fn first_d_tag(tags_text : String) -> String {
+  let j = @json.parse(fix_utf8(tags_text)) catch { _ => return "" }
+  guard j is Array(items) else { return "" }
+  for item in items {
+    guard item is Array(vals) else { continue }
+    guard vals.length() >= 2 else { continue }
+    guard vals[0] is String(name) else { continue }
+    guard vals[1] is String(v) else { continue }
+    if name == "d" {
+      return v
+    }
+  }
+  ""
+}
+
+///|
 /// INSERT ... ON CONFLICT (id) DO NOTHING; false means duplicate
 fn PgStore::insert(self : PgStore, ev : @event.Event) -> Result[Bool, String] {
   let sql = "INSERT INTO event (id, pubkey, created_at, kind, tags, content, sig) VALUES (" +
@@ -303,18 +322,17 @@ pub impl @storage.Storage for PgStore with fn add(self, ev) {
   let replaceable = @event.is_replaceable_kind(ev.kind)
   let addressable = @event.is_addressable_kind(ev.kind)
   if replaceable || addressable {
-    // Same approach as eventstore's ReplaceEvent: fetch the current
-    // event for this key, keep only the newest (lowest id on ties)
-    let mut cond = "pubkey = " +
+    // Fetch the current events for this (pubkey, kind); for addressable
+    // kinds the address also includes the first "d" tag, so we compare it
+    // in code (the tagvalues column can't distinguish the first d tag from
+    // later ones and never carries an entry for a missing d tag).
+    let cond = "pubkey = " +
       quote_str(ev.pubkey) +
       " AND kind = " +
       ev.kind.to_string()
-    if addressable {
-      cond = cond + " AND " + tag_condition("d", [ev.d_tag()])
-    }
     match
       self.run(
-        "SELECT id, created_at FROM event WHERE " +
+        "SELECT id, created_at, tags::text FROM event WHERE " +
         cond +
         " ORDER BY created_at DESC, id",
       ) {
@@ -322,7 +340,11 @@ pub impl @storage.Storage for PgStore with fn add(self, ev) {
         let rows = r.rows()
         let mut stale = false
         let older_ids : Array[String] = []
+        let d = ev.d_tag()
         for row in rows {
+          if addressable && first_d_tag(row[2]) != d {
+            continue
+          }
           if row[0] == ev.id {
             r.free()
             return Duplicate
