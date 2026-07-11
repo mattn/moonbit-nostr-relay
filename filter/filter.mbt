@@ -94,7 +94,11 @@ pub fn Filter::from_json(j : Json) -> Result[Filter, String] {
         limit = Some(n.to_int())
       }
       _ =>
-        if key.has_prefix("#") && key.length() >= 2 {
+        // NIP-01 tag filters use a single-letter name ("#e", "#p", ...).
+        // The PostgreSQL backend only indexes single-character tag names, so
+        // honouring longer keys here would match in memory but never in
+        // PostgreSQL; ignore them in both, like any other unknown key.
+        if key.has_prefix("#") && key.length() == 2 {
           let name = key[1:].to_owned()
           match json_string_array(value) {
             Ok(values) => tags.push(new_tag_filter(name, values))
