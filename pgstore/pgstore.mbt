@@ -46,7 +46,7 @@ let schema : Array[String] = [
     #|CREATE TABLE IF NOT EXISTS event (
     #|  id text NOT NULL,
     #|  pubkey text NOT NULL,
-    #|  created_at integer NOT NULL,
+    #|  created_at bigint NOT NULL,
     #|  kind integer NOT NULL,
     #|  tags jsonb NOT NULL,
     #|  content text NOT NULL,
