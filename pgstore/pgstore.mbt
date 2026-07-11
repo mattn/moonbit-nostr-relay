@@ -398,9 +398,10 @@ pub impl @storage.Storage for PgStore with fn query(self, f) {
   if conds.length() == 0 {
     conds.push("true")
   }
-  // eventstore caps every query at QueryLimit (default 100)
+  // eventstore caps every query at QueryLimit (default 100); a limit of 0
+  // is a valid NIP-01 request for no stored events, not an unset value.
   let limit = match f.limit {
-    Some(l) => if l < 1 || l > query_limit { query_limit } else { l }
+    Some(l) => if l < 0 || l > query_limit { query_limit } else { l }
     None => query_limit
   }
   let sb = StringBuilder::new()
