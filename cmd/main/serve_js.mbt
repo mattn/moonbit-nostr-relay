@@ -78,6 +78,7 @@ extern "js" fn node_ws_serve(
   #|    sock.setNoDelay(true);
   #|    let buf = Buffer.alloc(0);
   #|    let frags = [];
+  #|    let fragLen = 0;
   #|    let fragOp = 0;
   #|    let dead = false;
   #|    const shutdown = (code) => {
@@ -123,17 +124,21 @@ extern "js" fn node_ws_serve(
   #|        if (op === 10) continue;
   #|        if (op === 1 || op === 2) {
   #|          frags = [payload];
+  #|          fragLen = payload.length;
   #|          fragOp = op;
   #|        } else if (op === 0) {
   #|          if (fragOp === 0) { shutdown(1002); return; }
   #|          frags.push(payload);
+  #|          fragLen += payload.length;
   #|        } else {
   #|          shutdown(1002);
   #|          return;
   #|        }
+  #|        if (fragLen > MAX_FRAME) { shutdown(1009); return; }
   #|        if (fin) {
   #|          const full = Buffer.concat(frags);
   #|          frags = [];
+  #|          fragLen = 0;
   #|          const deliverOp = fragOp;
   #|          fragOp = 0;
   #|          if (deliverOp === 1) onMessage(id, full.toString('utf8'));
