@@ -362,6 +362,14 @@ pub impl @storage.Storage for PgStore with fn add(self, ev) {
         if stale {
           return Stale
         }
+        // Store the new event before pruning the older ones, so a failed
+        // insert (e.g. a created_at past the column range) can never leave
+        // the key with its previous event deleted and nothing in its place.
+        match self.insert(ev) {
+          Ok(true) => ()
+          Ok(false) => return Duplicate
+          Err(e) => return Failed(e)
+        }
         if older_ids.length() > 0 {
           match
             self.run("DELETE FROM event WHERE " + in_list("id", older_ids)) {
@@ -369,6 +377,7 @@ pub impl @storage.Storage for PgStore with fn add(self, ev) {
             Err(e) => return Failed(e)
           }
         }
+        return Added
       }
       Err(e) => return Failed(e)
     }
