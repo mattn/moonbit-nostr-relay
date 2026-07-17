@@ -26,12 +26,14 @@ over HTTP, forged-signature and tampered-id rejection, UTF-8 content
 - ✅ BIP-340 Schnorr verify + sign over secp256k1 (BigInt, Jacobian coords) — official test vectors
 - ✅ Event id check via NIP-01 canonical serialization (exact escaping rules)
 - ✅ Replaceable / addressable / ephemeral kind semantics, duplicate detection
+- ✅ NIP-26 delegated event signing: delegation tag shape, kind / created_at
+  conditions, delegator Schnorr signature over the delegation token
 - ✅ NIP-11 relay information document
 - ✅ Native transport: moonbitlang/async HTTP server + WebSocket
 - ✅ PostgreSQL storage backend (mattn/postgres / libpq) behind a Storage trait;
   events survive restarts, verified end-to-end with nak against PostgreSQL 16
 - ✅ JS transport: WebSocket server (RFC 6455) via inline JS FFI on node:http
-- ✅ 18 tests green (`moon test`)
+- ✅ 24 tests green (`moon test`)
 
 ## What's Pending
 
