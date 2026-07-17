@@ -86,6 +86,9 @@ All configuration is via environment variables:
   schema and query semantics are compatible with
   [fiatjaf/eventstore](https://github.com/fiatjaf/eventstore)'s postgresql
   driver, so an existing khatru/eventstore database can be reused as-is
+- **NIP-09**: event deletion — a kind-5 event deletes the events referenced
+  by its `e` tags, but only those authored by the same pubkey; the deletion
+  event itself is stored and served to clients
 - **NIP-26**: delegated event signing — `delegation` tags are validated
   (exact shape, kind / created_at conditions, and the delegator's Schnorr
   signature over the delegation token)
@@ -125,7 +128,7 @@ a `v*` tag publishes the corresponding semver tag.
 
 ## Not yet implemented
 
-- NIP-09 deletion, NIP-42 auth, rate limiting / PoW
+- NIP-42 auth, rate limiting / PoW
 - PostgreSQL on the JS backend (pgstore is native-only)
 
 ## License

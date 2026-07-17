@@ -463,6 +463,41 @@ pub impl @storage.Storage for PgStore with fn query(self, f) {
 }
 
 ///|
+/// NIP-09: the DELETE is keyed on id AND pubkey so a deletion request can
+/// never remove another user's event; when nothing was deleted a follow-up
+/// lookup distinguishes a missing target from a foreign-authored one.
+pub impl @storage.Storage for PgStore with fn delete(self, id, pubkey) {
+  match
+    self.run(
+      "DELETE FROM event WHERE id = " +
+      quote_str(id) +
+      " AND pubkey = " +
+      quote_str(pubkey),
+    ) {
+    Ok(r) => {
+      let deleted = r.affected_rows() > 0
+      r.free()
+      if deleted {
+        return Deleted
+      }
+    }
+    Err(e) => return DeleteFailed(e)
+  }
+  match self.run("SELECT 1 FROM event WHERE id = " + quote_str(id)) {
+    Ok(r) => {
+      let exists = r.rows().length() > 0
+      r.free()
+      if exists {
+        NotAuthor
+      } else {
+        NotFound
+      }
+    }
+    Err(e) => DeleteFailed(e)
+  }
+}
+
+///|
 pub impl @storage.Storage for PgStore with fn count(self) {
   match self.run("SELECT count(*) FROM event") {
     Ok(r) => {

@@ -16,7 +16,7 @@ pub fn eose(String) -> String
 
 pub fn event_msg(String, @event.Event) -> String
 
-pub fn nip11_doc() -> String
+pub fn nip11_doc(name? : String, description? : String, pubkey? : String, contact? : String, icon? : String) -> String
 
 pub fn notice(String) -> String
 

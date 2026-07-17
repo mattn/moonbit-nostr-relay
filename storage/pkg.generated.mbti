@@ -19,12 +19,20 @@ pub(all) enum AddOutcome {
   Failed(String)
 }
 
+pub(all) enum DeleteOutcome {
+  Deleted
+  NotFound
+  NotAuthor
+  DeleteFailed(String)
+}
+
 pub struct EventStore {
   events : Array[@event.Event]
   max_events : Int
 }
 pub fn EventStore::add(Self, @event.Event) -> AddOutcome
 pub fn EventStore::count(Self) -> Int
+pub fn EventStore::delete(Self, String, String) -> DeleteOutcome
 pub fn EventStore::query(Self, @filter.Filter) -> Array[@event.Event]
 pub impl Storage for EventStore
 
@@ -34,6 +42,7 @@ pub impl Storage for EventStore
 pub(open) trait Storage {
   fn add(Self, @event.Event) -> AddOutcome
   fn query(Self, @filter.Filter) -> Array[@event.Event]
+  fn delete(Self, String, String) -> DeleteOutcome
   fn count(Self) -> Int
 }
 
