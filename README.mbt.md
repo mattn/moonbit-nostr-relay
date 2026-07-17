@@ -86,6 +86,9 @@ All configuration is via environment variables:
   schema and query semantics are compatible with
   [fiatjaf/eventstore](https://github.com/fiatjaf/eventstore)'s postgresql
   driver, so an existing khatru/eventstore database can be reused as-is
+- **NIP-26**: delegated event signing — `delegation` tags are validated
+  (exact shape, kind / created_at conditions, and the delegator's Schnorr
+  signature over the delegation token)
 - **NIP-11**: relay information document, configurable via `RELAY_*` variables
 - **Static site**: files under `WEB_ROOT` are served on the same HTTP endpoint,
   so one URL is both the relay and its landing page
