@@ -23,7 +23,19 @@ pub fn nip11_doc(
   m.set("version", "0.1.3".to_json())
   m.set(
     "supported_nips",
-    ([1.0.to_json(), 11.0.to_json()] : Array[Json]).to_json(),
+    (
+      [
+        1.0.to_json(),
+        2.0.to_json(),
+        4.0.to_json(),
+        11.0.to_json(),
+        12.0.to_json(),
+        15.0.to_json(),
+        16.0.to_json(),
+        20.0.to_json(),
+        26.0.to_json(),
+        33.0.to_json(),
+      ] : Array[Json]).to_json(),
   )
   let limitation : Map[String, Json] = {}
   limitation.set("max_message_length", 1048576.0.to_json())
