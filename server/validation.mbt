@@ -40,6 +40,19 @@ fn verify_crypto(ev : @event.Event) -> Result[Unit, String] {
 }
 
 ///|
+/// NIP-70: an event is protected when any of its tags has "-" as its first
+/// element. This relay has no NIP-42 AUTH, so it can never prove a protected
+/// event is being published by its author and must reject it.
+fn is_protected(ev : @event.Event) -> Bool {
+  for tag in ev.tags {
+    if tag.length() >= 1 && tag[0] == "-" {
+      return true
+    }
+  }
+  false
+}
+
+///|
 /// NIP-26 delegated event signing. Events without a "delegation" tag pass
 /// unchanged. When the tag is present, its shape and conditions string are
 /// always checked; the delegator's Schnorr signature over the delegation

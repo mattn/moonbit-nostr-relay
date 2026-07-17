@@ -86,6 +86,16 @@ fn Relay::handle_event(
       ]
     Ok(_) => ()
   }
+  // NIP-70: protected events may only be published by their authenticated
+  // author, and this relay has no NIP-42 AUTH, so reject them outright.
+  if is_protected(ev) {
+    return [
+      {
+        client_id,
+        message: ok_msg(ev.id, false, "auth-required: need to authenticate"),
+      },
+    ]
+  }
   if @event.is_ephemeral_kind(ev.kind) {
     let out = [{ client_id, message: ok_msg(ev.id, true, "") }]
     out.append(self.broadcast(ev))
