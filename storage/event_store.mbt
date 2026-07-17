@@ -14,6 +14,14 @@ pub(all) enum AddOutcome {
 }
 
 ///|
+pub(all) enum DeleteOutcome {
+  Deleted // the referenced event was removed
+  NotFound // no stored event with this id
+  NotAuthor // the event exists but belongs to another pubkey
+  DeleteFailed(String) // storage backend error
+}
+
+///|
 pub fn new_store(max_events : Int) -> EventStore {
   { events: [], max_events }
 }
@@ -98,6 +106,25 @@ pub fn EventStore::query(
     None => ()
   }
   result
+}
+
+///|
+/// NIP-09: remove the event with this id, but only when it is authored by
+/// `pubkey`, so a deletion request can never remove another user's events.
+pub fn EventStore::delete(
+  self : EventStore,
+  id : String,
+  pubkey : String,
+) -> DeleteOutcome {
+  let idx = find_index(self, fn(e) { e.id == id })
+  if idx < 0 {
+    return NotFound
+  }
+  if self.events[idx].pubkey != pubkey {
+    return NotAuthor
+  }
+  let _ = self.events.remove(idx)
+  Deleted
 }
 
 ///|

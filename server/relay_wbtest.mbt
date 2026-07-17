@@ -219,6 +219,95 @@ test "replaceable and ephemeral kinds" {
 }
 
 ///|
+test "NIP-09 event deletion" {
+  let relay = Relay::new(test_config(), @storage.new_store(100))
+  let other_pk = "9999999999999999999999999999999999999999999999999999999999999999"
+  let other_id = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  let unknown_id = "4444444444444444444444444444444444444444444444444444444444444444"
+  // One note from our user, one from somebody else
+  let _ = relay.handle_message(
+    "1",
+    fake_event_json(fake_id1, fake_pk, 1000, 1, "[]", "mine"),
+  )
+  let _ = relay.handle_message(
+    "1",
+    fake_event_json(other_id, other_pk, 1001, 1, "[]", "theirs"),
+  )
+  // A kind-5 referencing another user's event is rejected
+  let r1 = relay.handle_message(
+    "1",
+    fake_event_json(
+      "2222222222222222222222222222222222222222222222222222222222222222",
+      fake_pk,
+      1100,
+      5,
+      "[[\"e\",\"\{other_id}\"]]",
+      "",
+    ),
+  )
+  inspect(
+    dump(r1),
+    content=(
+      #|[1 <- ["OK","2222222222222222222222222222222222222222222222222222222222222222",false,"insufficient permissions"]]
+    ),
+  )
+  // ... and the other user's event is still stored
+  let r2 = relay.handle_message(
+    "2",
+    "[\"REQ\",\"o\",{\"ids\":[\"\{other_id}\"]}]",
+  )
+  inspect(
+    dump(r2).map(fn(s) { head(s, 28) }),
+    content=(
+      #|[2 <- ["EVENT","o",{"id":"ccc, 2 <- ["EOSE","o"]]
+    ),
+  )
+  // A kind-5 from the author deletes the note; unknown ids are skipped
+  let r3 = relay.handle_message(
+    "1",
+    fake_event_json(
+      "3333333333333333333333333333333333333333333333333333333333333333",
+      fake_pk,
+      1101,
+      5,
+      "[[\"e\",\"\{fake_id1}\"],[\"e\",\"\{unknown_id}\"]]",
+      "",
+    ),
+  )
+  inspect(
+    dump(r3),
+    content=(
+      #|[1 <- ["OK","3333333333333333333333333333333333333333333333333333333333333333",true,""]]
+    ),
+  )
+  // The deleted note is gone
+  let r4 = relay.handle_message(
+    "2",
+    "[\"REQ\",\"d\",{\"ids\":[\"\{fake_id1}\"]}]",
+  )
+  inspect(
+    dump(r4),
+    content=(
+      #|[2 <- ["EOSE","d"]]
+    ),
+  )
+  // The deletion event itself is stored and queryable
+  let r5 = relay.handle_message("2", "[\"REQ\",\"k5\",{\"kinds\":[5]}]")
+  inspect(
+    dump(r5).map(fn(s) { head(s, 29) }),
+    content=(
+      #|[2 <- ["EVENT","k5",{"id":"333, 2 <- ["EOSE","k5"]]
+    ),
+  )
+  inspect(
+    relay.stats(),
+    content=(
+      #|events: 2, clients: 1, subscriptions: 3
+    ),
+  )
+}
+
+///|
 test "malformed input" {
   let relay = Relay::new(test_config(), @storage.new_store(100))
   inspect(

@@ -28,6 +28,7 @@ pub fn nip11_doc(
         1.0.to_json(),
         2.0.to_json(),
         4.0.to_json(),
+        9.0.to_json(),
         11.0.to_json(),
         12.0.to_json(),
         15.0.to_json(),

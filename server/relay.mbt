@@ -91,6 +91,15 @@ fn Relay::handle_event(
     out.append(self.broadcast(ev))
     return out
   }
+  // NIP-09: apply the deletions first, then store and broadcast the
+  // kind-5 event itself like any other event so clients can see it.
+  if ev.kind == @event.kind_event_deletion {
+    match self.apply_deletion(ev) {
+      Err(reason) =>
+        return [{ client_id, message: ok_msg(ev.id, false, reason) }]
+      Ok(_) => ()
+    }
+  }
   match self.store.add(ev) {
     Added => {
       let out = [{ client_id, message: ok_msg(ev.id, true, "") }]
@@ -118,6 +127,27 @@ fn Relay::handle_event(
     Failed(msg) =>
       [{ client_id, message: ok_msg(ev.id, false, "error: " + msg) }]
   }
+}
+
+///|
+/// NIP-09: delete every event referenced by an "e" tag of a kind-5
+/// deletion event. Only events authored by the deletion's own pubkey may
+/// be deleted; a reference to another user's event is rejected, and a
+/// reference to an unknown id is skipped.
+fn Relay::apply_deletion(
+  self : Relay,
+  ev : @event.Event,
+) -> Result[Unit, String] {
+  for tag in ev.tags {
+    if tag.length() >= 2 && tag[0] == "e" {
+      match self.store.delete(tag[1], ev.pubkey) {
+        Deleted | NotFound => ()
+        NotAuthor => return Err("insufficient permissions")
+        DeleteFailed(msg) => return Err("error: " + msg)
+      }
+    }
+  }
+  Ok(())
 }
 
 ///|
