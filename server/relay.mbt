@@ -86,6 +86,19 @@ fn Relay::handle_event(
       ]
     Ok(_) => ()
   }
+  // NIP-22: reject events whose created_at is outside the accepted window
+  if !created_at_in_limits(ev.created_at, (self.config.now)()) {
+    return [
+      {
+        client_id,
+        message: ok_msg(
+          ev.id,
+          false,
+          "invalid: created_at is out of the acceptable range",
+        ),
+      },
+    ]
+  }
   // NIP-70: protected events may only be published by their authenticated
   // author, and this relay has no NIP-42 AUTH, so reject them outright.
   if is_protected(ev) {
@@ -176,11 +189,16 @@ fn Relay::handle_req(
     }
   }
   client_subs.set(sub_id, filters)
-  // Merge per-filter query results, deduplicated by id, newest first
+  // Merge per-filter query results, deduplicated by id, newest first.
+  // NIP-40: expired events stay stored but are never served.
+  let now = (self.config.now)()
   let seen : Map[String, Bool] = {}
   let merged : Array[@event.Event] = []
   for f in filters {
     for ev in self.store.query(f) {
+      if ev.is_expired(now) {
+        continue
+      }
       if !seen.contains(ev.id) {
         seen.set(ev.id, true)
         merged.push(ev)
@@ -209,9 +227,13 @@ fn Relay::handle_req(
 }
 
 ///|
-/// Deliver a fresh event to every matching subscription of every client
+/// Deliver a fresh event to every matching subscription of every client.
+/// NIP-40: an already-expired event is accepted but never delivered.
 fn Relay::broadcast(self : Relay, ev : @event.Event) -> Array[Outgoing] {
   let out : Array[Outgoing] = []
+  if ev.is_expired((self.config.now)()) {
+    return out
+  }
   for client_id, client_subs in self.subs {
     for sub_id, filters in client_subs {
       let mut matched = false

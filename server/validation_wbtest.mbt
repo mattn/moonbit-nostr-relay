@@ -226,6 +226,7 @@ test "delegated event through the relay" {
     port: 0,
     max_events: 100,
     verify_sigs: true,
+    now: fn() { 1751234567 },
   }
   let relay = Relay::new(config, @storage.new_store(100))
   let delegatee_pk = must_pubkey(delegatee_seckey)
