@@ -89,9 +89,15 @@ All configuration is via environment variables:
 - **NIP-09**: event deletion — a kind-5 event deletes the events referenced
   by its `e` tags, but only those authored by the same pubkey; the deletion
   event itself is stored and served to clients
+- **NIP-22**: `created_at` limits — events stamped more than 15 minutes in
+  the future or more than 3 years in the past are rejected
 - **NIP-26**: delegated event signing — `delegation` tags are validated
   (exact shape, kind / created_at conditions, and the delegator's Schnorr
   signature over the delegation token)
+- **NIP-28**: public chat — channel events (kinds 40-44) are stored and
+  served like any other events, no relay-side logic required
+- **NIP-40**: expiration — events carrying an `["expiration", "<unix ts>"]`
+  tag stay stored but are no longer served (REQ or broadcast) past that time
 - **NIP-70**: protected events — an event carrying a `["-"]` tag is rejected
   with `auth-required` since the relay has no NIP-42 AUTH to prove authorship
 - **NIP-11**: relay information document, configurable via `RELAY_*` variables

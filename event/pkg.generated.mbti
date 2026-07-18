@@ -37,7 +37,9 @@ pub(all) struct Event {
   sig : String
 }
 pub fn Event::d_tag(Self) -> String
+pub fn Event::expiration(Self) -> UInt64?
 pub fn Event::from_json(Json) -> Result[Self, String]
+pub fn Event::is_expired(Self, UInt64) -> Bool
 pub fn Event::serialize_for_id(Self) -> String
 pub fn Event::to_json(Self) -> Json
 pub fn Event::validate(Self) -> Result[Unit, String]

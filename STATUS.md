@@ -28,8 +28,14 @@ over HTTP, forged-signature and tampered-id rejection, UTF-8 content
 - ✅ Replaceable / addressable / ephemeral kind semantics, duplicate detection
 - ✅ NIP-09 event deletion: kind-5 events delete the events referenced by
   their "e" tags (same author only) and are themselves stored and served
+- ✅ NIP-22 created_at limits: events stamped more than 15 minutes in the
+  future or 3 years in the past are rejected as out of the acceptable range
 - ✅ NIP-26 delegated event signing: delegation tag shape, kind / created_at
   conditions, delegator Schnorr signature over the delegation token
+- ✅ NIP-28 public chat: channel events (kinds 40-44) are stored and served
+  generically, verified end-to-end with kind-42 channel messages
+- ✅ NIP-40 expiration: events with an ["expiration", ts] tag stay stored
+  but are no longer served (REQ or live broadcast) once the time has passed
 - ✅ NIP-70 protected events: events tagged ["-"] are rejected with
   "auth-required" (no NIP-42 AUTH, so their author can never be proven)
 - ✅ NIP-11 relay information document
@@ -37,7 +43,7 @@ over HTTP, forged-signature and tampered-id rejection, UTF-8 content
 - ✅ PostgreSQL storage backend (mattn/postgres / libpq) behind a Storage trait;
   events survive restarts, verified end-to-end with nak against PostgreSQL 16
 - ✅ JS transport: WebSocket server (RFC 6455) via inline JS FFI on node:http
-- ✅ 26 tests green (`moon test`)
+- ✅ 30 tests green (`moon test`)
 
 ## What's Pending
 

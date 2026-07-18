@@ -40,6 +40,26 @@ fn verify_crypto(ev : @event.Event) -> Result[Unit, String] {
 }
 
 ///|
+/// NIP-22 accepted created_at window around the relay's clock: at most
+/// 15 minutes into the future and 3 years into the past.
+pub let created_at_future_limit : UInt64 = 900
+
+///|
+pub let created_at_past_limit : UInt64 = 94608000
+
+///|
+/// NIP-22: whether an event's created_at falls inside the accepted window
+pub fn created_at_in_limits(created_at : UInt64, now : UInt64) -> Bool {
+  if created_at > now + created_at_future_limit {
+    return false
+  }
+  if now >= created_at_past_limit && created_at < now - created_at_past_limit {
+    return false
+  }
+  true
+}
+
+///|
 /// NIP-70: an event is protected when any of its tags has "-" as its first
 /// element. This relay has no NIP-42 AUTH, so it can never prove a protected
 /// event is being published by its author and must reject it.

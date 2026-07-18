@@ -68,6 +68,48 @@ pub fn Event::d_tag(self : Event) -> String {
 }
 
 ///|
+/// NIP-40: value of the first parseable "expiration" tag as a unix
+/// timestamp, or None when absent or malformed (malformed tags are ignored)
+pub fn Event::expiration(self : Event) -> UInt64? {
+  for tag in self.tags {
+    if tag.length() >= 2 && tag[0] == "expiration" {
+      match parse_timestamp(tag[1]) {
+        Some(t) => return Some(t)
+        None => ()
+      }
+    }
+  }
+  None
+}
+
+///|
+/// NIP-40: true when the event carries an expiration timestamp at or
+/// before `now` and must no longer be served to clients
+pub fn Event::is_expired(self : Event, now : UInt64) -> Bool {
+  match self.expiration() {
+    Some(t) => t <= now
+    None => false
+  }
+}
+
+///|
+/// Parse a non-empty all-digit decimal string; None on any other input
+fn parse_timestamp(s : String) -> UInt64? {
+  if s.length() == 0 {
+    return None
+  }
+  let mut acc : UInt64 = 0
+  for c in s {
+    if c >= '0' && c <= '9' {
+      acc = acc * 10 + (c.to_int() - 48).reinterpret_as_uint().to_uint64()
+    } else {
+      return None
+    }
+  }
+  Some(acc)
+}
+
+///|
 fn is_lower_hex(s : String) -> Bool {
   if s.length() == 0 {
     return false

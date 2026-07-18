@@ -10,6 +10,12 @@ import {
 // Values
 pub fn closed(String, String) -> String
 
+pub let created_at_future_limit : UInt64
+
+pub fn created_at_in_limits(UInt64, UInt64) -> Bool
+
+pub let created_at_past_limit : UInt64
+
 pub fn default_config() -> Config
 
 pub fn eose(String) -> String
@@ -22,6 +28,8 @@ pub fn notice(String) -> String
 
 pub fn ok_msg(String, Bool, String) -> String
 
+pub fn unix_now() -> UInt64
+
 pub fn verify_event(@event.Event, Bool) -> Result[Unit, String]
 
 // Errors
@@ -32,6 +40,7 @@ pub(all) struct Config {
   port : Int
   max_events : Int
   verify_sigs : Bool
+  now : () -> UInt64
 }
 
 pub struct Outgoing {

@@ -28,6 +28,7 @@ async fn main {
     port,
     max_events: 100000,
     verify_sigs: true,
+    now: @server.unix_now,
   }
   let store : &@storage.Storage = match @env.get_env_var("DATABASE_URL") {
     Some(url) =>

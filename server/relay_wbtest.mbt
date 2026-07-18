@@ -1,6 +1,14 @@
 ///|
 fn test_config() -> Config {
-  { host: "127.0.0.1", port: 0, max_events: 100, verify_sigs: false }
+  // Fixed clock: old enough that the NIP-22 past limit is inactive and the
+  // small created_at values used throughout these tests stay acceptable
+  {
+    host: "127.0.0.1",
+    port: 0,
+    max_events: 100,
+    verify_sigs: false,
+    now: fn() { 100000 },
+  }
 }
 
 ///|
@@ -323,7 +331,10 @@ test "NIP-70 protected events" {
     ),
   )
   // ... and it is not stored
-  let r2 = relay.handle_message("2", "[\"REQ\",\"p\",{\"ids\":[\"\{fake_id1}\"]}]")
+  let r2 = relay.handle_message(
+    "2",
+    "[\"REQ\",\"p\",{\"ids\":[\"\{fake_id1}\"]}]",
+  )
   inspect(
     dump(r2),
     content=(
@@ -349,6 +360,158 @@ test "NIP-70 protected events" {
       #|[1 <- ["OK","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",true,""]]
     ),
   )
+}
+
+///|
+test "NIP-22 created_at limit boundaries" {
+  let now : UInt64 = 1752800000
+  // Up to 15 minutes into the future is acceptable, beyond is not
+  inspect(created_at_in_limits(now, now), content="true")
+  inspect(created_at_in_limits(now + 900, now), content="true")
+  inspect(created_at_in_limits(now + 901, now), content="false")
+  // Up to 3 years into the past is acceptable, beyond is not
+  inspect(created_at_in_limits(now - 94608000, now), content="true")
+  inspect(created_at_in_limits(now - 94608001, now), content="false")
+  // A clock younger than the past limit imposes no lower bound
+  inspect(created_at_in_limits(0, 1000), content="true")
+}
+
+///|
+test "NIP-22 created_at limits through the relay" {
+  let config : Config = { ..test_config(), now: fn() { 1752800000 } } // 2025-07-18
+  let relay = Relay::new(config, @storage.new_store(100))
+  // An event stamped now is accepted
+  let r1 = relay.handle_message(
+    "1",
+    fake_event_json(fake_id1, fake_pk, 1752800000, 1, "[]", "fresh"),
+  )
+  inspect(
+    dump(r1),
+    content=(
+      #|[1 <- ["OK","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",true,""]]
+    ),
+  )
+  // One hour in the future is rejected
+  let r2 = relay.handle_message(
+    "1",
+    fake_event_json(fake_id2, fake_pk, 1752803600, 1, "[]", "future"),
+  )
+  inspect(
+    dump(r2),
+    content=(
+      #|[1 <- ["OK","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",false,"invalid: created_at is out of the acceptable range"]]
+    ),
+  )
+  // A timestamp from 2001 is rejected
+  let r3 = relay.handle_message(
+    "1",
+    fake_event_json(
+      "5555555555555555555555555555555555555555555555555555555555555555", fake_pk,
+      978307200, 1, "[]", "ancient",
+    ),
+  )
+  inspect(
+    dump(r3),
+    content=(
+      #|[1 <- ["OK","5555555555555555555555555555555555555555555555555555555555555555",false,"invalid: created_at is out of the acceptable range"]]
+    ),
+  )
+  inspect(relay.stats(), content="events: 1, clients: 0, subscriptions: 0")
+}
+
+///|
+test "NIP-40 expiration parsing" {
+  let base : @event.Event = {
+    id: fake_id1,
+    pubkey: fake_pk,
+    created_at: 1000,
+    kind: 1,
+    tags: [],
+    content: "",
+    sig: fake_sig,
+  }
+  inspect(base.expiration(), content="None")
+  inspect(
+    { ..base, tags: [["expiration", "1234"]] }.expiration(),
+    content="Some(1234)",
+  )
+  // Malformed values are ignored; a later well-formed tag still counts
+  inspect(
+    { ..base, tags: [["expiration", "abc"]] }.expiration(),
+    content="None",
+  )
+  inspect({ ..base, tags: [["expiration", ""]] }.expiration(), content="None")
+  inspect({ ..base, tags: [["expiration"]] }.expiration(), content="None")
+  inspect(
+    { ..base, tags: [["expiration", "-5"], ["expiration", "99"]] }.expiration(),
+    content="Some(99)",
+  )
+  // An event expires at its expiration timestamp, not before
+  let ev : @event.Event = { ..base, tags: [["expiration", "2000"]] }
+  inspect(ev.is_expired(1999), content="false")
+  inspect(ev.is_expired(2000), content="true")
+  inspect(base.is_expired(2000), content="false")
+}
+
+///|
+test "NIP-40 expired events are stored but not served" {
+  let config : Config = { ..test_config(), now: fn() { 2000000 } }
+  let relay = Relay::new(config, @storage.new_store(100))
+  // Subscribe client 1 to everything
+  let _ = relay.handle_message("1", "[\"REQ\",\"sub\",{}]")
+  // An already-expired event is accepted but not broadcast
+  let r1 = relay.handle_message(
+    "2",
+    fake_event_json(
+      fake_id1, fake_pk, 2000000, 1, "[[\"expiration\",\"1000000\"]]", "gone",
+    ),
+  )
+  inspect(
+    dump(r1),
+    content=(
+      #|[2 <- ["OK","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",true,""]]
+    ),
+  )
+  // A not-yet-expired event is broadcast normally
+  let r2 = relay.handle_message(
+    "2",
+    fake_event_json(
+      fake_id2, fake_pk, 2000000, 1, "[[\"expiration\",\"3000000\"]]", "alive",
+    ),
+  )
+  inspect(
+    dump(r2).map(fn(s) { head(s, 20) }),
+    content=(
+      #|[2 <- ["OK","cccccccc, 1 <- ["EVENT","sub",]
+    ),
+  )
+  // A malformed expiration value is treated as no expiration
+  let r3 = relay.handle_message(
+    "2",
+    fake_event_json(
+      "6666666666666666666666666666666666666666666666666666666666666666", fake_pk,
+      2000001, 1, "[[\"expiration\",\"oops\"]]", "kept",
+    ),
+  )
+  inspect(
+    dump(r3).map(fn(s) { head(s, 20) }),
+    content=(
+      #|[2 <- ["OK","66666666, 1 <- ["EVENT","sub",]
+    ),
+  )
+  // REQ serves the live and malformed-expiration events, not the expired
+  // one, although all three are stored
+  let r4 = relay.handle_message(
+    "3",
+    "[\"REQ\",\"q\",{\"authors\":[\"\{fake_pk}\"]}]",
+  )
+  inspect(
+    dump(r4).map(fn(s) { head(s, 26) }),
+    content=(
+      #|[3 <- ["EVENT","q",{"id":"6, 3 <- ["EVENT","q",{"id":"c, 3 <- ["EOSE","q"]]
+    ),
+  )
+  inspect(relay.stats(), content="events: 3, clients: 2, subscriptions: 2")
 }
 
 ///|
@@ -399,6 +562,7 @@ test "signature verification with real crypto" {
     port: 0,
     max_events: 100,
     verify_sigs: true,
+    now: fn() { 1751234567 },
   }
   let relay = Relay::new(config, @storage.new_store(100))
   // Build and sign a real event with seckey 3 (BIP-340 test key)
