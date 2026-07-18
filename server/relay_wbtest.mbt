@@ -308,6 +308,50 @@ test "NIP-09 event deletion" {
 }
 
 ///|
+test "NIP-70 protected events" {
+  let relay = Relay::new(test_config(), @storage.new_store(100))
+  // An event tagged with ["-"] is protected: without NIP-42 AUTH the
+  // relay can never accept it.
+  let r1 = relay.handle_message(
+    "1",
+    fake_event_json(fake_id1, fake_pk, 1000, 1, "[[\"-\"]]", "secret"),
+  )
+  inspect(
+    dump(r1),
+    content=(
+      #|[1 <- ["OK","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",false,"auth-required: need to authenticate"]]
+    ),
+  )
+  // ... and it is not stored
+  let r2 = relay.handle_message("2", "[\"REQ\",\"p\",{\"ids\":[\"\{fake_id1}\"]}]")
+  inspect(
+    dump(r2),
+    content=(
+      #|[2 <- ["EOSE","p"]]
+    ),
+  )
+  // Only a first element that is exactly "-" marks the event protected:
+  // "-x" and ordinary tags are unaffected.
+  let r3 = relay.handle_message(
+    "1",
+    fake_event_json(
+      fake_id2,
+      fake_pk,
+      1001,
+      1,
+      "[[\"-x\",\"v\"],[\"e\",\"\{fake_id1}\"]]",
+      "public",
+    ),
+  )
+  inspect(
+    dump(r3),
+    content=(
+      #|[1 <- ["OK","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",true,""]]
+    ),
+  )
+}
+
+///|
 test "malformed input" {
   let relay = Relay::new(test_config(), @storage.new_store(100))
   inspect(

@@ -36,6 +36,7 @@ pub fn nip11_doc(
         20.0.to_json(),
         26.0.to_json(),
         33.0.to_json(),
+        70.0.to_json(),
       ] : Array[Json]).to_json(),
   )
   let limitation : Map[String, Json] = {}
