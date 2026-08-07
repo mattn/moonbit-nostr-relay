@@ -26,7 +26,8 @@
 
 ///|
 pub struct PgStore {
-  conn : @postgres.Connection
+  mut conn : @postgres.Connection
+  conninfo : String
 }
 
 ///|
@@ -75,20 +76,39 @@ pub fn PgStore::connect(conninfo : String) -> Result[PgStore, String] {
           Err(e) => return Err("schema init failed: " + e.to_string())
         }
       }
-      Ok({ conn, })
+      Ok({ conn, conninfo })
     }
     Err(e) => Err(e.to_string())
   }
 }
 
 ///|
+/// A dropped server connection stays dropped: the binding exposes no
+/// connection-status call, so it only surfaces as a failing statement, and
+/// without this the relay serves empty results until it is restarted.
+///
+/// Every statement issued here is idempotent (SELECT, DELETE ... WHERE,
+/// INSERT ... ON CONFLICT DO NOTHING), so rather than guess from the error
+/// text whether the connection died, reconnect and retry once on any
+/// failure. A statement that is genuinely wrong just fails again.
 fn PgStore::run(
   self : PgStore,
   sql : String,
 ) -> Result[@postgres.QueryResult, String] {
   match self.conn.query(sql) {
     Ok(r) => Ok(r)
-    Err(e) => Err(e.to_string())
+    Err(e) =>
+      match @postgres.connect(self.conninfo) {
+        Ok(conn) => {
+          self.conn.close()
+          self.conn = conn
+          match self.conn.query(sql) {
+            Ok(r) => Ok(r)
+            Err(e2) => Err(e2.to_string())
+          }
+        }
+        Err(_) => Err(e.to_string())
+      }
   }
 }
 
