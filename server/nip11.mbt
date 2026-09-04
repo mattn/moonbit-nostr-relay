@@ -25,21 +25,8 @@ pub fn nip11_doc(
     "supported_nips",
     (
       [
-        1.0.to_json(),
-        2.0.to_json(),
-        4.0.to_json(),
-        9.0.to_json(),
-        11.0.to_json(),
-        12.0.to_json(),
-        15.0.to_json(),
-        16.0.to_json(),
-        20.0.to_json(),
-        22.0.to_json(),
-        26.0.to_json(),
-        28.0.to_json(),
-        33.0.to_json(),
-        40.0.to_json(),
-        70.0.to_json(),
+        1.0.to_json(), 4.0.to_json(), 9.0.to_json(), 11.0.to_json(),
+        26.0.to_json(), 40.0.to_json(), 70.0.to_json(),
       ] : Array[Json]).to_json(),
   )
   let limitation : Map[String, Json] = {}
