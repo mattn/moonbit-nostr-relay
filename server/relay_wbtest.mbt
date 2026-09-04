@@ -128,6 +128,36 @@ test "req then event broadcast" {
 }
 
 ///|
+test "NIP-45 COUNT unions filters, deduplicates, and ignores REQ limits" {
+  let relay = Relay::new(test_config(), @storage.new_store(100))
+  let _ = relay.handle_message(
+    "1",
+    fake_event_json(fake_id1, fake_pk, 1000, 1, "[]", "one"),
+  )
+  let _ = relay.handle_message(
+    "1",
+    fake_event_json(fake_id2, fake_pk, 1001, 7, "[]", "two"),
+  )
+  inspect(
+    dump(
+      relay.handle_message(
+        "2",
+        "[\"COUNT\",\"c\",{\"authors\":[\"\{fake_pk}\"],\"limit\":1},{\"kinds\":[1]}]",
+      ),
+    ),
+    content=(
+      #|[2 <- ["COUNT","c",{"count":2}]]
+    ),
+  )
+  inspect(
+    relay.stats(),
+    content=(
+      #|events: 2, clients: 0, subscriptions: 0
+    ),
+  )
+}
+
+///|
 test "filters: since until limit tags" {
   let relay = Relay::new(test_config(), @storage.new_store(100))
   for i = 0; i < 5; i = i + 1 {

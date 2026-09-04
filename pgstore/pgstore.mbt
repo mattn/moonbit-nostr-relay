@@ -390,7 +390,11 @@ pub impl @storage.Storage for PgStore with fn add(self, ev) {
 }
 
 ///|
-pub impl @storage.Storage for PgStore with fn query(self, f) {
+fn PgStore::query_internal(
+  self : PgStore,
+  f : @filter.Filter,
+  apply_limit : Bool,
+) -> Array[@event.Event] {
   let conds : Array[String] = []
   if f.ids.length() > 0 {
     conds.push(in_list("id", f.ids))
@@ -445,7 +449,9 @@ pub impl @storage.Storage for PgStore with fn query(self, f) {
     }
     sb.write_string(cond)
   }
-  sb.write_string(" ORDER BY created_at DESC, id LIMIT \{limit}")
+  if apply_limit {
+    sb.write_string(" ORDER BY created_at DESC, id LIMIT \{limit}")
+  }
   let result : Array[@event.Event] = []
   match self.run(sb.to_string()) {
     Ok(r) => {
@@ -460,6 +466,24 @@ pub impl @storage.Storage for PgStore with fn query(self, f) {
     Err(_) => () // treat backend errors as empty result for queries
   }
   result
+}
+
+///|
+pub impl @storage.Storage for PgStore with fn query(self, f) {
+  self.query_internal(f, true)
+}
+
+///|
+pub impl @storage.Storage for PgStore with fn count_filtered(self, filters, now) {
+  let seen : Map[String, Bool] = {}
+  for f in filters {
+    for ev in self.query_internal(f, false) {
+      if !ev.is_expired(now) {
+        seen.set(ev.id, true)
+      }
+    }
+  }
+  seen.length()
 }
 
 ///|

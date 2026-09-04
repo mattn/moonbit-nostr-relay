@@ -5,6 +5,7 @@
 pub(open) trait Storage {
   fn add(Self, @event.Event) -> AddOutcome
   fn query(Self, @filter.Filter) -> Array[@event.Event]
+  fn count_filtered(Self, Array[@filter.Filter], UInt64) -> Int
   fn delete(Self, String, String) -> DeleteOutcome
   fn count(Self) -> Int
 }
@@ -17,6 +18,11 @@ pub impl Storage for EventStore with fn add(self, ev) {
 ///|
 pub impl Storage for EventStore with fn query(self, f) {
   EventStore::query(self, f)
+}
+
+///|
+pub impl Storage for EventStore with fn count_filtered(self, filters, now) {
+  EventStore::count_filtered(self, filters, now)
 }
 
 ///|

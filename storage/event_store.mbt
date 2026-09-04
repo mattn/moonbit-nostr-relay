@@ -109,6 +109,28 @@ pub fn EventStore::query(
 }
 
 ///|
+/// Count the union of all filters without applying their per-REQ limits.
+pub fn EventStore::count_filtered(
+  self : EventStore,
+  filters : Array[@filter.Filter],
+  now : UInt64,
+) -> Int {
+  let seen : Map[String, Bool] = {}
+  for ev in self.events {
+    if ev.is_expired(now) {
+      continue
+    }
+    for f in filters {
+      if f.matches(ev) {
+        seen.set(ev.id, true)
+        break
+      }
+    }
+  }
+  seen.length()
+}
+
+///|
 /// NIP-09: remove the event with this id, but only when it is authored by
 /// `pubkey`, so a deletion request can never remove another user's events.
 pub fn EventStore::delete(
