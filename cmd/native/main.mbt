@@ -101,7 +101,7 @@ async fn main {
           }
         } catch {
           @aqueue.QueueAlreadyClosed => ()
-          _ => ()
+          err => raise err
         }
       })
       for ;; {
