@@ -26,7 +26,7 @@ pub fn nip11_doc(
     (
       [
         1.0.to_json(), 4.0.to_json(), 9.0.to_json(), 11.0.to_json(),
-        26.0.to_json(), 40.0.to_json(), 70.0.to_json(), 78.0.to_json(),
+        26.0.to_json(), 40.0.to_json(), 66.0.to_json(), 70.0.to_json(), 78.0.to_json(),
 
       ] : Array[Json]).to_json(),
   )
