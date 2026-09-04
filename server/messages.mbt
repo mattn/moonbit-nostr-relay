@@ -27,6 +27,18 @@ pub fn closed(sub_id : String, msg : String) -> String {
 }
 
 ///|
+pub fn count_msg(query_id : String, count : Int) -> String {
+  (
+    [
+      ("COUNT" : Json),
+      query_id.to_json(),
+      ({ "count": count.to_json() } : Map[String, Json]).to_json(),
+    ] : Array[Json])
+  .to_json()
+  .stringify()
+}
+
+///|
 pub fn event_msg(sub_id : String, ev : @event.Event) -> String {
   ([("EVENT" : Json), sub_id.to_json(), ev.to_json()] : Array[Json])
   .to_json()

@@ -58,6 +58,30 @@ pub fn Relay::handle_message(
       }
       self.handle_req(client_id, sub_id, filters)
     }
+    [String("COUNT"), String(query_id), .. filters_json] => {
+      if filters_json.length() == 0 {
+        return [
+          { client_id, message: closed(query_id, "invalid: missing filter") },
+        ]
+      }
+      let filters : Array[@filter.Filter] = []
+      for fj in filters_json {
+        match @filter.Filter::from_json(fj) {
+          Ok(f) => filters.push(f)
+          Err(e) =>
+            return [{ client_id, message: closed(query_id, "invalid: " + e) }]
+        }
+      }
+      [
+        {
+          client_id,
+          message: count_msg(
+            query_id,
+            self.store.count_filtered(filters, (self.config.now)()),
+          ),
+        },
+      ]
+    }
     [String("CLOSE"), String(sub_id)] => {
       match self.subs.get(client_id) {
         Some(client_subs) => client_subs.remove(sub_id)
