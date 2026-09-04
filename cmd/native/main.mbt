@@ -88,14 +88,20 @@ async fn main {
     outboxes.set(client_id, outbox)
     defer {
       outboxes.remove(client_id)
+      outbox.close(clear=true)
       relay.client_disconnected(client_id)
       ws.close()
     }
     @async.with_task_group(g => {
       g.spawn_bg(no_wait=true, () => {
-        for ;; {
-          let msg = outbox.get()
-          ws.send_text(msg)
+        try {
+          for ;; {
+            let msg = outbox.get()
+            ws.send_text(msg)
+          }
+        } catch {
+          @aqueue.QueueAlreadyClosed => ()
+          _ => ()
         }
       })
       for ;; {
