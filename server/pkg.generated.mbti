@@ -8,7 +8,11 @@ import {
 }
 
 // Values
+pub fn auth_msg(String) -> String
+
 pub fn closed(String, String) -> String
+
+pub fn count_msg(String, Int) -> String
 
 pub let created_at_future_limit : UInt64
 
@@ -43,6 +47,8 @@ pub(all) struct Config {
   now : () -> UInt64
 }
 
+type ConnectionAuth
+
 pub struct Outgoing {
   client_id : String
   message : String
@@ -52,7 +58,9 @@ pub struct Relay {
   config : Config
   store : &@storage.Storage
   subs : Map[String, Map[String, Array[@filter.Filter]]]
+  auth : Map[String, ConnectionAuth]
 }
+pub fn Relay::client_connected(Self, String, String, String) -> Unit
 pub fn Relay::client_disconnected(Self, String) -> Unit
 pub fn Relay::handle_message(Self, String, String) -> Array[Outgoing]
 pub fn Relay::new(Config, &@storage.Storage) -> Self

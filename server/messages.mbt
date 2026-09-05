@@ -44,3 +44,8 @@ pub fn event_msg(sub_id : String, ev : @event.Event) -> String {
   .to_json()
   .stringify()
 }
+
+///|
+pub fn auth_msg(challenge : String) -> String {
+  (["AUTH".to_json(), challenge.to_json()] : Array[Json]).to_json().stringify()
+}

@@ -522,6 +522,43 @@ pub impl @storage.Storage for PgStore with fn delete(self, id, pubkey) {
 }
 
 ///|
+pub impl @storage.Storage for PgStore with fn delete_gift_wrap(
+  self,
+  id,
+  recipient,
+) {
+  match
+    self.run(
+      "DELETE FROM event WHERE id = " +
+      quote_str(id) +
+      " AND kind = 1059 AND EXISTS (SELECT 1 FROM jsonb_array_elements(tags) tag WHERE tag->>0 = 'p' AND tag->>1 = " +
+      quote_str(recipient) +
+      ")",
+    ) {
+    Ok(r) => {
+      let deleted = r.affected_rows() > 0
+      r.free()
+      if deleted {
+        return Deleted
+      }
+    }
+    Err(e) => return DeleteFailed(e)
+  }
+  match self.run("SELECT 1 FROM event WHERE id = " + quote_str(id)) {
+    Ok(r) => {
+      let exists = r.rows().length() > 0
+      r.free()
+      if exists {
+        NotAuthor
+      } else {
+        NotFound
+      }
+    }
+    Err(e) => DeleteFailed(e)
+  }
+}
+
+///|
 pub impl @storage.Storage for PgStore with fn count(self) {
   match self.run("SELECT count(*) FROM event") {
     Ok(r) => {
