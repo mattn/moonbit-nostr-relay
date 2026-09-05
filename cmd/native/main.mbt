@@ -86,6 +86,14 @@ async fn main {
     let client_id = next_id.to_string()
     let outbox : @aqueue.Queue[String] = @aqueue.Queue(kind=Unbounded)
     outboxes.set(client_id, outbox)
+    let challenge = @crypto.sha256_hex(
+      @crypto.utf8_bytes("{@env.now()}:{client_id}"),
+    )
+    let relay_url = @env.get_env_var("RELAY_URL").unwrap_or(
+      "wss://" + request.headers.get("host").unwrap_or(""),
+    )
+    relay.client_connected(client_id, challenge, relay_url)
+    outbox.put(@server.auth_msg(challenge))
     defer {
       outboxes.remove(client_id)
       outbox.close(clear=true)

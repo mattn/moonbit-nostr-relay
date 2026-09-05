@@ -14,6 +14,14 @@ pub struct Relay {
   store : &@storage.Storage
   // client id -> subscription id -> filters
   subs : Map[String, Map[String, Array[@filter.Filter]]]
+  auth : Map[String, ConnectionAuth]
+}
+
+///|
+struct ConnectionAuth {
+  challenge : String
+  relay_url : String
+  pubkeys : Map[String, Bool]
 }
 
 ///|
@@ -25,7 +33,18 @@ pub struct Outgoing {
 
 ///|
 pub fn Relay::new(config : Config, store : &@storage.Storage) -> Relay {
-  { config, store, subs: {} }
+  { config, store, subs: {}, auth: {} }
+}
+
+///|
+/// Register a connection and its NIP-42 challenge.
+pub fn Relay::client_connected(
+  self : Relay,
+  client_id : String,
+  challenge : String,
+  relay_url : String,
+) -> Unit {
+  self.auth.set(client_id, { challenge, relay_url, pubkeys: {} })
 }
 
 ///|
@@ -44,6 +63,7 @@ pub fn Relay::handle_message(
   }
   match j {
     [String("EVENT"), ev_json] => self.handle_event(client_id, ev_json)
+    [String("AUTH"), ev_json] => self.handle_auth(client_id, ev_json)
     [String("REQ"), String(sub_id), .. filters_json] => {
       let filters : Array[@filter.Filter] = []
       for fj in filters_json {
@@ -75,10 +95,7 @@ pub fn Relay::handle_message(
       [
         {
           client_id,
-          message: count_msg(
-            query_id,
-            self.store.count_filtered(filters, (self.config.now)()),
-          ),
+          message: count_msg(query_id, self.count_visible(client_id, filters)),
         },
       ]
     }
@@ -91,6 +108,89 @@ pub fn Relay::handle_message(
     }
     _ => [{ client_id, message: notice("invalid: unknown message type") }]
   }
+}
+
+///|
+fn Relay::visible_to(
+  self : Relay,
+  client_id : String,
+  ev : @event.Event,
+) -> Bool {
+  if ev.kind != 1059 {
+    return true
+  }
+  match self.auth.get(client_id) {
+    None => false
+    Some(auth) =>
+      ev.tags.any(fn(tag) {
+        tag.length() >= 2 && tag[0] == "p" && auth.pubkeys.contains(tag[1])
+      })
+  }
+}
+
+///|
+fn Relay::count_visible(
+  self : Relay,
+  client_id : String,
+  filters : Array[@filter.Filter],
+) -> Int {
+  let seen : Map[String, Bool] = {}
+  let now = (self.config.now)()
+  for f in filters {
+    for ev in self.store.query(f) {
+      if !ev.is_expired(now) && self.visible_to(client_id, ev) {
+        seen.set(ev.id, true)
+      }
+    }
+  }
+  seen.length()
+}
+
+///|
+fn Relay::handle_auth(
+  self : Relay,
+  client_id : String,
+  ev_json : Json,
+) -> Array[Outgoing] {
+  let ev = match @event.Event::from_json(ev_json) {
+    Ok(ev) => ev
+    Err(e) => return [{ client_id, message: notice("invalid: " + e) }]
+  }
+  let reject = fn(reason : String) {
+    [{ client_id, message: ok_msg(ev.id, false, "invalid: " + reason) }]
+  }
+  guard self.auth.get(client_id) is Some(auth) else {
+    return reject("connection has no authentication challenge")
+  }
+  if ev.kind != 22242 {
+    return reject("authentication event must be kind 22242")
+  }
+  let now = (self.config.now)()
+  if ev.created_at > now + 600 || ev.created_at + 600 < now {
+    return reject("authentication event timestamp is out of range")
+  }
+  if !ev.tags.any(fn(tag) {
+      tag.length() >= 2 && tag[0] == "challenge" && tag[1] == auth.challenge
+    }) {
+    return reject("authentication challenge does not match")
+  }
+  if !ev.tags.any(fn(tag) {
+      tag.length() >= 2 &&
+      tag[0] == "relay" &&
+      (
+        tag[1] == auth.relay_url ||
+        tag[1] == auth.relay_url + "/" ||
+        tag[1] + "/" == auth.relay_url
+      )
+    }) {
+    return reject("authentication relay does not match")
+  }
+  match verify_event(ev, self.config.verify_sigs) {
+    Err(reason) => return reject("authentication " + reason)
+    Ok(_) => ()
+  }
+  auth.pubkeys.set(ev.pubkey, true)
+  [{ client_id, message: ok_msg(ev.id, true, "") }]
 }
 
 ///|
@@ -123,9 +223,12 @@ fn Relay::handle_event(
       },
     ]
   }
-  // NIP-70: protected events may only be published by their authenticated
-  // author, and this relay has no NIP-42 AUTH, so reject them outright.
-  if is_protected(ev) {
+  // NIP-70: protected events may only be published by their authenticated author.
+  let authenticated_author = match self.auth.get(client_id) {
+    Some(auth) => auth.pubkeys.contains(ev.pubkey)
+    None => false
+  }
+  if is_protected(ev) && !authenticated_author {
     return [
       {
         client_id,
@@ -189,7 +292,12 @@ fn Relay::apply_deletion(
     if tag.length() >= 2 && tag[0] == "e" {
       match self.store.delete(tag[1], ev.pubkey) {
         Deleted | NotFound => ()
-        NotAuthor => return Err("insufficient permissions")
+        NotAuthor =>
+          match self.store.delete_gift_wrap(tag[1], ev.pubkey) {
+            Deleted | NotFound => ()
+            NotAuthor => return Err("insufficient permissions")
+            DeleteFailed(msg) => return Err("error: " + msg)
+          }
         DeleteFailed(msg) => return Err("error: " + msg)
       }
     }
@@ -223,7 +331,7 @@ fn Relay::handle_req(
       if ev.is_expired(now) {
         continue
       }
-      if !seen.contains(ev.id) {
+      if self.visible_to(client_id, ev) && !seen.contains(ev.id) {
         seen.set(ev.id, true)
         merged.push(ev)
       }
@@ -259,6 +367,9 @@ fn Relay::broadcast(self : Relay, ev : @event.Event) -> Array[Outgoing] {
     return out
   }
   for client_id, client_subs in self.subs {
+    if !self.visible_to(client_id, ev) {
+      continue
+    }
     for sub_id, filters in client_subs {
       let mut matched = false
       for f in filters {
@@ -279,6 +390,7 @@ fn Relay::broadcast(self : Relay, ev : @event.Event) -> Array[Outgoing] {
 /// Drop all state for a disconnected client
 pub fn Relay::client_disconnected(self : Relay, client_id : String) -> Unit {
   self.subs.remove(client_id)
+  self.auth.remove(client_id)
 }
 
 ///|

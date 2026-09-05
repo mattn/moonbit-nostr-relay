@@ -10,6 +10,7 @@ import {
   "mattn/moonbit_nostr_relay/server",
   "mattn/moonbit_nostr_relay/storage",
   "mattn/moonbit_nostr_relay/pgstore",
+  "mattn/moonbit_nostr_relay/crypto",
 }
 
 supported_targets = "+native"

@@ -393,6 +393,58 @@ test "NIP-70 protected events" {
 }
 
 ///|
+test "NIP-42 authentication gates NIP-17 gift wraps" {
+  let relay = Relay::new(test_config(), @storage.new_store(100))
+  relay.client_connected("auth", "challenge-1", "wss://relay.example")
+  relay.client_connected("anon", "challenge-2", "wss://relay.example")
+  let auth_event = "[\"AUTH\",{\"id\":\"" +
+    fake_id1 +
+    "\",\"pubkey\":\"" +
+    fake_pk +
+    "\",\"created_at\":100000,\"kind\":22242,\"tags\":[[\"relay\",\"wss://relay.example\"],[\"challenge\",\"challenge-1\"]],\"content\":\"\",\"sig\":\"" +
+    fake_sig +
+    "\"}]"
+  inspect(
+    dump(relay.handle_message("auth", auth_event)),
+    content=(
+      #|[auth <- ["OK","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",true,""]]
+    ),
+  )
+  let _ = relay.handle_message(
+    "auth", "[\"REQ\",\"private\",{\"kinds\":[1059],\"limit\":0}]",
+  )
+  let _ = relay.handle_message(
+    "anon", "[\"REQ\",\"private\",{\"kinds\":[1059],\"limit\":0}]",
+  )
+  let gift = fake_event_json(
+    fake_id2,
+    fake_pk,
+    100000,
+    1059,
+    "[[\"p\",\"" + fake_pk + "\"]]",
+    "gift",
+  )
+  inspect(
+    dump(relay.handle_message("sender", gift)).map(fn(s) { head(s, 20) }),
+    content=(
+      #|[sender <- ["OK","ccc, auth <- ["EVENT","pr]
+    ),
+  )
+  inspect(
+    dump(relay.handle_message("anon", "[\"COUNT\",\"c\",{\"kinds\":[1059]}]")),
+    content=(
+      #|[anon <- ["COUNT","c",{"count":0}]]
+    ),
+  )
+  inspect(
+    dump(relay.handle_message("auth", "[\"COUNT\",\"c\",{\"kinds\":[1059]}]")),
+    content=(
+      #|[auth <- ["COUNT","c",{"count":1}]]
+    ),
+  )
+}
+
+///|
 test "NIP-22 created_at limit boundaries" {
   let now : UInt64 = 1752800000
   // Up to 15 minutes into the future is acceptable, beyond is not

@@ -150,6 +150,28 @@ pub fn EventStore::delete(
 }
 
 ///|
+/// NIP-59 permits a gift-wrap recipient to delete a referenced kind-1059 event.
+pub fn EventStore::delete_gift_wrap(
+  self : EventStore,
+  id : String,
+  recipient : String,
+) -> DeleteOutcome {
+  let idx = find_index(self, fn(e) { e.id == id })
+  if idx < 0 {
+    return NotFound
+  }
+  let ev = self.events[idx]
+  if ev.kind != 1059 ||
+    !ev.tags.any(fn(tag) {
+      tag.length() >= 2 && tag[0] == "p" && tag[1] == recipient
+    }) {
+    return NotAuthor
+  }
+  let _ = self.events.remove(idx)
+  Deleted
+}
+
+///|
 pub fn EventStore::count(self : EventStore) -> Int {
   self.events.length()
 }
