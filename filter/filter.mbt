@@ -10,6 +10,7 @@ pub struct Filter {
   since : UInt64?
   until : UInt64?
   limit : Int?
+  search : String? // NIP-50
   tags : Array[TagFilter] // "#e", "#p", ... entries
 }
 
@@ -23,6 +24,7 @@ pub fn new() -> Filter {
     since: None,
     until: None,
     limit: None,
+    search: None,
     tags: [],
   }
 }
@@ -49,6 +51,7 @@ pub fn Filter::from_json(j : Json) -> Result[Filter, String] {
   let mut since : UInt64? = None
   let mut until : UInt64? = None
   let mut limit : Int? = None
+  let mut search : String? = None
   for key, value in obj {
     match key {
       "ids" =>
@@ -93,6 +96,10 @@ pub fn Filter::from_json(j : Json) -> Result[Filter, String] {
         }
         limit = Some(n.to_int())
       }
+      "search" => {
+        guard value is String(sv) else { return Err("search: expected a string") }
+        search = Some(sv)
+      }
       _ =>
         // NIP-01 tag filters use a single-letter name ("#e", "#p", ...).
         // The PostgreSQL backend only indexes single-character tag names, so
@@ -107,7 +114,7 @@ pub fn Filter::from_json(j : Json) -> Result[Filter, String] {
         }
     }
   }
-  Ok({ ids, authors, kinds, since, until, limit, tags })
+  Ok({ ids, authors, kinds, since, until, limit, search, tags })
 }
 
 ///|
@@ -118,6 +125,87 @@ fn contains(arr : Array[String], s : String) -> Bool {
     }
   }
   false
+}
+
+///|
+fn is_space(c : Char) -> Bool {
+  c == ' ' || c == '\t' || c == '\n' || c == '\r'
+}
+
+///|
+fn to_chars(s : String) -> Array[Char] {
+  let out : Array[Char] = []
+  for c in s {
+    out.push(c)
+  }
+  out
+}
+
+///|
+/// ASCII case-insensitive character comparison. Non-ASCII characters, which
+/// is most of what gets searched here, compare unchanged.
+fn eq_ignore_ascii_case(a : Char, b : Char) -> Bool {
+  let mut x = a.to_int()
+  let mut y = b.to_int()
+  if x >= 0x41 && x <= 0x5A {
+    x = x + 32
+  }
+  if y >= 0x41 && y <= 0x5A {
+    y = y + 32
+  }
+  x == y
+}
+
+///|
+fn contains_ignore_ascii_case(hay : Array[Char], needle : Array[Char]) -> Bool {
+  let n = needle.length()
+  if n == 0 {
+    return true
+  }
+  let h = hay.length()
+  if n > h {
+    return false
+  }
+  for i = 0; i <= h - n; i = i + 1 {
+    let mut matched = true
+    for j = 0; j < n; j = j + 1 {
+      if !eq_ignore_ascii_case(hay[i + j], needle[j]) {
+        matched = false
+        break
+      }
+    }
+    if matched {
+      return true
+    }
+  }
+  false
+}
+
+///|
+/// NIP-50: split the search string into words. An event matches when every
+/// word occurs in its content, which is also what the PostgreSQL backend asks
+/// for, so stored and live results agree.
+pub fn Filter::search_words(self : Filter) -> Array[String] {
+  let out : Array[String] = []
+  guard self.search is Some(s) else { return out }
+  let chars = to_chars(s)
+  let n = chars.length()
+  let mut i = 0
+  while i < n {
+    while i < n && is_space(chars[i]) {
+      i = i + 1
+    }
+    if i >= n {
+      break
+    }
+    let sb = StringBuilder::new()
+    while i < n && !is_space(chars[i]) {
+      sb.write_char(chars[i])
+      i = i + 1
+    }
+    out.push(sb.to_string())
+  }
+  out
 }
 
 ///|
@@ -148,6 +236,15 @@ pub fn Filter::matches(self : Filter, ev : @event.Event) -> Bool {
   match self.until {
     Some(until) => if ev.created_at > until { return false }
     None => ()
+  }
+  let words = self.search_words()
+  if words.length() > 0 {
+    let content = to_chars(ev.content)
+    for word in words {
+      if !contains_ignore_ascii_case(content, to_chars(word)) {
+        return false
+      }
+    }
   }
   for tf in self.tags {
     if !tf.matches(ev.tags) {
