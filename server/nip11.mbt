@@ -34,6 +34,7 @@ pub fn nip11_doc(
         40.0.to_json(),
         42.0.to_json(),
         45.0.to_json(),
+        50.0.to_json(),
         59.0.to_json(),
         66.0.to_json(),
         70.0.to_json(),

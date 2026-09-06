@@ -204,6 +204,20 @@ fn fix_utf8(s : String) -> String {
 }
 
 ///|
+/// Escape the LIKE wildcards so a search for '%' cannot match everything.
+/// quote_str then carries the backslashes through as literal characters.
+fn escape_like(s : String) -> String {
+  let sb = StringBuilder::new()
+  for c in s {
+    if c == '\\' || c == '%' || c == '_' {
+      sb.write_char('\\')
+    }
+    sb.write_char(c)
+  }
+  sb.to_string()
+}
+
+///|
 /// "a IN ('x','y')" style condition from string values
 fn in_list(column : String, values : Array[String]) -> String {
   let sb = StringBuilder::new()
@@ -429,6 +443,10 @@ fn PgStore::query_internal(
   match f.until {
     Some(until) => conds.push("created_at <= " + until.to_string())
     None => ()
+  }
+  // NIP-50: every word of the search string must occur in the content
+  for word in f.search_words() {
+    conds.push("content ILIKE " + quote_str("%" + escape_like(word) + "%"))
   }
   if conds.length() == 0 {
     conds.push("true")
