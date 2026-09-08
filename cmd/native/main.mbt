@@ -54,6 +54,7 @@ async fn main {
     pubkey?=@env.get_env_var("RELAY_PUBKEY"),
     contact?=@env.get_env_var("RELAY_CONTACT"),
     icon?=@env.get_env_var("RELAY_ICON"),
+    countries?=@env.get_env_var("RELAY_COUNTRIES"),
   )
   let relay = @server.Relay::new(config, store)
   // client id -> outgoing message queue, drained by a per-client writer task
