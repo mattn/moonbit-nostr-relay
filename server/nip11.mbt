@@ -6,6 +6,7 @@ pub fn nip11_doc(
   pubkey? : String = "",
   contact? : String = "",
   icon? : String = "",
+  countries? : String = "JP",
 ) -> String {
   let m : Map[String, Json] = {}
   m.set("name", name.to_json())
@@ -41,6 +42,18 @@ pub fn nip11_doc(
         78.0.to_json(),
       ] : Array[Json]).to_json(),
   )
+  // NIP-11 relay_countries: the two letter codes of the jurisdictions the
+  // relay operates under, comma separated in RELAY_COUNTRIES.
+  let country_list : Array[Json] = []
+  for country in countries.split(",") {
+    let trimmed = country.to_string().trim(chars=" \t").to_string()
+    if trimmed != "" {
+      country_list.push(trimmed.to_json())
+    }
+  }
+  if country_list.length() > 0 {
+    m.set("relay_countries", country_list.to_json())
+  }
   let limitation : Map[String, Json] = {}
   limitation.set("max_message_length", 1048576.0.to_json())
   limitation.set("max_event_tags", 2000.0.to_json())
