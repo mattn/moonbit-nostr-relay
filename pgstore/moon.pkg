@@ -1,6 +1,6 @@
 import {
   "moonbitlang/core/json",
-  "moonbitlang/core/strconv",
+  "moonbitlang/core/string",
   "mattn/postgres",
   "mattn/moonbit_nostr_relay/event",
   "mattn/moonbit_nostr_relay/filter",
