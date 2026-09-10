@@ -13,6 +13,6 @@ keywords = [ "nostr", "relay" ]
 description = "A Nostr relay server implementation in MoonBit"
 
 import {
-  "mattn/postgres@0.10.5",
+  "mattn/postgres@0.10.6",
   "moonbitlang/async@0.20.1",
 }
