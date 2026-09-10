@@ -15,7 +15,7 @@ async fn main {
   let host = @env.get_env_var("HOST").unwrap_or("0.0.0.0")
   let port = match @env.get_env_var("PORT") {
     Some(p) =>
-      @strconv.parse_int(p) catch {
+      @string.parse_int(p) catch {
         _ => {
           println("invalid PORT: \{p}")
           return

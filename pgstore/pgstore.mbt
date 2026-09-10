@@ -259,10 +259,10 @@ fn row_to_event(row : Array[String]) -> Result[@event.Event, String] {
   if row.length() < 7 {
     return Err("unexpected row shape")
   }
-  let created_at = @strconv.parse_uint64(row[2]) catch {
+  let created_at = @string.parse_uint64(row[2]) catch {
     _ => return Err("bad created_at in row")
   }
-  let kind = @strconv.parse_uint(row[3]) catch {
+  let kind = @string.parse_uint(row[3]) catch {
     _ => return Err("bad kind in row")
   }
   let tags_json = @json.parse(fix_utf8(row[4])) catch {
@@ -369,7 +369,7 @@ pub impl @storage.Storage for PgStore with fn add(self, ev) {
             r.free()
             return Duplicate
           }
-          let existing_created = @strconv.parse_uint64(row[1]) catch { _ => 0 }
+          let existing_created = @string.parse_uint64(row[1]) catch { _ => 0 }
           // On equal timestamps NIP-01 keeps the event with the lowest id
           if existing_created > ev.created_at ||
             (existing_created == ev.created_at && row[0] < ev.id) {
@@ -588,7 +588,7 @@ pub impl @storage.Storage for PgStore with fn count(self) {
     Ok(r) => {
       let rows = r.rows()
       let n = if rows.length() > 0 {
-        @strconv.parse_int(rows[0][0]) catch {
+        @string.parse_int(rows[0][0]) catch {
           _ => 0
         }
       } else {
