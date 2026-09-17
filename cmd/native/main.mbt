@@ -88,7 +88,7 @@ async fn main {
     let outbox : @aqueue.Queue[String] = @aqueue.Queue(kind=Unbounded)
     outboxes.set(client_id, outbox)
     let challenge = @crypto.sha256_hex(
-      @crypto.utf8_bytes("{@env.now()}:{client_id}"),
+      @crypto.utf8_bytes("\{@env.now()}:\{client_id}"),
     )
     let relay_url = @env.get_env_var("RELAY_URL").unwrap_or(
       "wss://" + request.headers.get("host").unwrap_or(""),
