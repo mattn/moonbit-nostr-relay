@@ -26,7 +26,8 @@
 
 ///|
 pub struct PgStore {
-  conn : @postgres.Connection
+  conninfo : String
+  mut conn : @postgres.Connection
 }
 
 ///|
@@ -81,20 +82,67 @@ pub fn PgStore::connect(conninfo : String) -> Result[PgStore, String] {
           Err(e) => return Err("schema init failed: " + e.to_string())
         }
       }
-      Ok({ conn, })
+      Ok({ conninfo, conn })
     }
     Err(e) => Err(e.to_string())
   }
 }
 
 ///|
+/// libpq reports a dead socket with one of these messages. Anything else
+/// (syntax errors, constraint violations, ...) is a real query failure and
+/// must not trigger a reconnect.
+fn is_connection_lost(msg : String) -> Bool {
+  msg.contains("no connection to the server") ||
+  msg.contains("server closed the connection unexpectedly") ||
+  msg.contains("terminating connection") ||
+  msg.contains("could not receive data from server") ||
+  msg.contains("could not send data to server") ||
+  msg.contains("SSL SYSCALL error") ||
+  msg.contains("connection not open")
+}
+
+///|
+/// Drop the dead connection and open a fresh one on the same conninfo.
+/// The schema was created by the first connect and is not re-applied.
+fn PgStore::reconnect(self : PgStore) -> Result[Unit, String] {
+  self.conn.close()
+  match @postgres.connect(self.conninfo) {
+    Ok(conn) => {
+      self.conn = conn
+      println("pgstore: reconnected to PostgreSQL")
+      Ok(())
+    }
+    Err(e) => Err("reconnect failed: " + e.to_string())
+  }
+}
+
+///|
+/// Run one statement. When libpq reports that the server connection is
+/// gone (PostgreSQL restarted, idle connection dropped by a proxy, ...)
+/// reconnect once and retry, so a single backend hiccup does not leave the
+/// relay rejecting every EVENT until the process is restarted.
 fn PgStore::run(
   self : PgStore,
   sql : String,
 ) -> Result[@postgres.QueryResult, String] {
   match self.conn.query(sql) {
     Ok(r) => Ok(r)
-    Err(e) => Err(e.to_string())
+    Err(e) => {
+      let msg = e.to_string()
+      if !is_connection_lost(msg) {
+        return Err(msg)
+      }
+      println("pgstore: connection lost (\{msg.trim()}), reconnecting")
+      match self.reconnect() {
+        Ok(_) => ()
+        Err(re) => return Err(re)
+      }
+      match self.conn.query(sql) {
+        Ok(r) => Ok(r)
+        Err(e2) => Err(e2.to_string())
+      }
+    }
   }
 }
 
