@@ -141,4 +141,4 @@ a `v*` tag publishes the corresponding semver tag.
 
 ## License
 
-Apache-2.0
+MIT
