@@ -6,7 +6,7 @@ readme = "README.mbt.md"
 
 repository = "https://github.com/mattn/moonbit-nostr-relay"
 
-license = "Apache-2.0"
+license = "MIT"
 
 keywords = [ "nostr", "relay" ]
 
