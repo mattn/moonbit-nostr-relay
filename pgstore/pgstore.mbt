@@ -463,6 +463,9 @@ fn PgStore::query_internal(
   f : @filter.Filter,
   apply_limit : Bool,
 ) -> Array[@event.Event] {
+  if f.match_nothing {
+    return []
+  }
   let conds : Array[String] = []
   if f.ids.length() > 0 {
     conds.push(in_list("id", f.ids))

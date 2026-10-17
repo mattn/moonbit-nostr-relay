@@ -12,6 +12,9 @@ pub struct Filter {
   limit : Int?
   search : String? // NIP-50
   tags : Array[TagFilter] // "#e", "#p", ... entries
+  // NIP-01: an empty ids/authors/kinds/tag list can never be satisfied, so
+  // the filter matches nothing (it is not the same as leaving the key out).
+  match_nothing : Bool
 }
 
 ///|
@@ -26,6 +29,7 @@ pub fn new() -> Filter {
     limit: None,
     search: None,
     tags: [],
+    match_nothing: false,
   }
 }
 
@@ -52,21 +56,35 @@ pub fn Filter::from_json(j : Json) -> Result[Filter, String] {
   let mut until : UInt64? = None
   let mut limit : Int? = None
   let mut search : String? = None
+  let mut match_nothing = false
   for key, value in obj {
     match key {
       "ids" =>
         match json_string_array(value) {
-          Ok(v) => ids.append(v)
+          Ok(v) => {
+            if v.length() == 0 {
+              match_nothing = true
+            }
+            ids.append(v)
+          }
           Err(e) => return Err("ids: " + e)
         }
       "authors" =>
         match json_string_array(value) {
-          Ok(v) => authors.append(v)
+          Ok(v) => {
+            if v.length() == 0 {
+              match_nothing = true
+            }
+            authors.append(v)
+          }
           Err(e) => return Err("authors: " + e)
         }
       "kinds" => {
         guard value is Array(items) else {
           return Err("kinds: expected an array of numbers")
+        }
+        if items.length() == 0 {
+          match_nothing = true
         }
         for item in items {
           guard item is Number(n, ..) else {
@@ -108,13 +126,18 @@ pub fn Filter::from_json(j : Json) -> Result[Filter, String] {
         if key.has_prefix("#") && key.length() == 2 {
           let name = key[1:].to_owned()
           match json_string_array(value) {
-            Ok(values) => tags.push(new_tag_filter(name, values))
+            Ok(values) => {
+              if values.length() == 0 {
+                match_nothing = true
+              }
+              tags.push(new_tag_filter(name, values))
+            }
             Err(e) => return Err(key + ": " + e)
           }
         }
     }
   }
-  Ok({ ids, authors, kinds, since, until, limit, search, tags })
+  Ok({ ids, authors, kinds, since, until, limit, search, tags, match_nothing })
 }
 
 ///|
@@ -211,6 +234,9 @@ pub fn Filter::search_words(self : Filter) -> Array[String] {
 ///|
 /// Match an event against this filter
 pub fn Filter::matches(self : Filter, ev : @event.Event) -> Bool {
+  if self.match_nothing {
+    return false
+  }
   if self.ids.length() > 0 && !contains(self.ids, ev.id) {
     return false
   }
