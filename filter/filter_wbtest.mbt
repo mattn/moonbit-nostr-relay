@@ -27,3 +27,35 @@ test "only single-letter tag keys become tag filters" {
     sig: "d".repeat(128),
   }), content="false")
 }
+
+///|
+test "NIP-01 empty filter lists match nothing" {
+  let ev : @event.Event = {
+    id: "a".repeat(64),
+    pubkey: "b".repeat(64),
+    created_at: 1000,
+    kind: 1,
+    tags: [["e", "ref"]],
+    content: "x",
+    sig: "d".repeat(128),
+  }
+  for key in ["ids", "authors", "kinds", "#e"] {
+    let empty : Array[String] = []
+    let m : Map[String, Json] = Map::from_array([(key, empty.to_json())])
+    let f = match Filter::from_json(m.to_json()) {
+      Ok(f) => f
+      Err(e) => {
+        fail(e)
+        return
+      }
+    }
+    inspect(f.match_nothing, content="true")
+    inspect(f.matches(ev), content="false")
+  }
+  // A filter without those keys still matches everything.
+  let all : Map[String, Json] = { "limit": (3).to_json() }
+  match Filter::from_json(all.to_json()) {
+    Ok(f) => inspect(f.matches(ev), content="true")
+    Err(e) => fail(e)
+  }
+}
