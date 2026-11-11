@@ -369,7 +369,7 @@ fn PgStore::insert(self : PgStore, ev : @event.Event) -> Result[Bool, String] {
     ", " +
     ev.kind.to_string() +
     ", " +
-    quote_str(ev.tags.to_json().stringify()) +
+    quote_str(Json(ev.tags).stringify()) +
     "::jsonb, " +
     quote_str(ev.content) +
     ", " +

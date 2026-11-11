@@ -193,14 +193,17 @@ pub fn Event::from_json(j : Json) -> Result[Event, String] {
 /// Convert an event to its JSON representation
 pub fn Event::to_json(self : Event) -> Json {
   let obj : Map[String, Json] = {}
-  obj.set("id", self.id.to_json())
-  obj.set("pubkey", self.pubkey.to_json())
-  obj.set("created_at", self.created_at.to_double().to_json())
-  obj.set("kind", self.kind.to_uint64().to_double().to_json())
-  obj.set("tags", self.tags.to_json())
-  obj.set("content", self.content.to_json())
-  obj.set("sig", self.sig.to_json())
-  obj.to_json()
+  obj.set("id", Json::string(self.id))
+  obj.set("pubkey", Json::string(self.pubkey))
+  obj.set("created_at", Json::number(self.created_at.to_double()))
+  obj.set("kind", Json::number(self.kind.to_uint64().to_double()))
+  obj.set(
+    "tags",
+    Json::array(self.tags.map(tag => Json::array(tag.map(Json::string)))),
+  )
+  obj.set("content", Json::string(self.content))
+  obj.set("sig", Json::string(self.sig))
+  Json::object(obj)
 }
 
 ///|

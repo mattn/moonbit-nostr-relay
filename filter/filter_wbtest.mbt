@@ -1,10 +1,7 @@
 ///|
 test "only single-letter tag keys become tag filters" {
-  let m : Map[String, Json] = {
-    "#e": ["ref"].to_json(),
-    "#foo": ["bar"].to_json(),
-  }
-  let f = match Filter::from_json(m.to_json()) {
+  let m : Map[String, Json] = { "#e": Json(["ref"]), "#foo": Json(["bar"]) }
+  let f = match Filter::from_json(Json(m)) {
     Ok(f) => f
     Err(e) => {
       fail(e)
@@ -41,8 +38,8 @@ test "NIP-01 empty filter lists match nothing" {
   }
   for key in ["ids", "authors", "kinds", "#e"] {
     let empty : Array[String] = []
-    let m : Map[String, Json] = Map::from_array([(key, empty.to_json())])
-    let f = match Filter::from_json(m.to_json()) {
+    let m : Map[String, Json] = Map::from_array([(key, Json(empty))])
+    let f = match Filter::from_json(Json(m)) {
       Ok(f) => f
       Err(e) => {
         fail(e)
@@ -53,8 +50,8 @@ test "NIP-01 empty filter lists match nothing" {
     inspect(f.matches(ev), content="false")
   }
   // A filter without those keys still matches everything.
-  let all : Map[String, Json] = { "limit": (3).to_json() }
-  match Filter::from_json(all.to_json()) {
+  let all : Map[String, Json] = { "limit": Json(3) }
+  match Filter::from_json(Json(all)) {
     Ok(f) => inspect(f.matches(ev), content="true")
     Err(e) => fail(e)
   }

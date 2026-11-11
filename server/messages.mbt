@@ -2,50 +2,39 @@
 
 ///|
 pub fn notice(msg : String) -> String {
-  ([("NOTICE" : Json), msg.to_json()] : Array[Json]).to_json().stringify()
+  Json::array([Json("NOTICE"), Json(msg)]).stringify()
 }
 
 ///|
 pub fn ok_msg(event_id : String, success : Bool, msg : String) -> String {
-  (
-    [("OK" : Json), event_id.to_json(), success.to_json(), msg.to_json()] :
-    Array[Json])
-  .to_json()
-  .stringify()
+  Json::array([Json("OK"), Json(event_id), Json(success), Json(msg)]).stringify()
 }
 
 ///|
 pub fn eose(sub_id : String) -> String {
-  ([("EOSE" : Json), sub_id.to_json()] : Array[Json]).to_json().stringify()
+  Json::array([Json("EOSE"), Json(sub_id)]).stringify()
 }
 
 ///|
 pub fn closed(sub_id : String, msg : String) -> String {
-  ([("CLOSED" : Json), sub_id.to_json(), msg.to_json()] : Array[Json])
-  .to_json()
-  .stringify()
+  Json::array([Json("CLOSED"), Json(sub_id), Json(msg)]).stringify()
 }
 
 ///|
 pub fn count_msg(query_id : String, count : Int) -> String {
-  (
-    [
-      ("COUNT" : Json),
-      query_id.to_json(),
-      ({ "count": count.to_json() } : Map[String, Json]).to_json(),
-    ] : Array[Json])
-  .to_json()
-  .stringify()
+  Json::array([
+    Json("COUNT"),
+    Json(query_id),
+    Json::object(Map::from_array([("count", Json(count))])),
+  ]).stringify()
 }
 
 ///|
 pub fn event_msg(sub_id : String, ev : @event.Event) -> String {
-  ([("EVENT" : Json), sub_id.to_json(), ev.to_json()] : Array[Json])
-  .to_json()
-  .stringify()
+  Json::array([Json("EVENT"), Json(sub_id), ev.to_json()]).stringify()
 }
 
 ///|
 pub fn auth_msg(challenge : String) -> String {
-  (["AUTH".to_json(), challenge.to_json()] : Array[Json]).to_json().stringify()
+  Json::array([Json("AUTH"), Json(challenge)]).stringify()
 }
