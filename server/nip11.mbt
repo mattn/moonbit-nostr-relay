@@ -9,38 +9,37 @@ pub fn nip11_doc(
   countries? : String = "JP",
 ) -> String {
   let m : Map[String, Json] = {}
-  m.set("name", name.to_json())
-  m.set("description", description.to_json())
+  m.set("name", Json(name))
+  m.set("description", Json(description))
   if pubkey != "" {
-    m.set("pubkey", pubkey.to_json())
+    m.set("pubkey", Json(pubkey))
   }
   if contact != "" {
-    m.set("contact", contact.to_json())
+    m.set("contact", Json(contact))
   }
   if icon != "" {
-    m.set("icon", icon.to_json())
+    m.set("icon", Json(icon))
   }
-  m.set("software", "https://github.com/mattn/moonbit-nostr-relay".to_json())
-  m.set("version", "0.1.3".to_json())
+  m.set("software", Json("https://github.com/mattn/moonbit-nostr-relay"))
+  m.set("version", Json("0.1.3"))
   m.set(
     "supported_nips",
-    (
-      [
-        1.0.to_json(),
-        4.0.to_json(),
-        9.0.to_json(),
-        11.0.to_json(),
-        17.0.to_json(),
-        26.0.to_json(),
-        40.0.to_json(),
-        42.0.to_json(),
-        45.0.to_json(),
-        50.0.to_json(),
-        59.0.to_json(),
-        66.0.to_json(),
-        70.0.to_json(),
-        78.0.to_json(),
-      ] : Array[Json]).to_json(),
+    Json::array([
+      Json(1.0),
+      Json(4.0),
+      Json(9.0),
+      Json(11.0),
+      Json(17.0),
+      Json(26.0),
+      Json(40.0),
+      Json(42.0),
+      Json(45.0),
+      Json(50.0),
+      Json(59.0),
+      Json(66.0),
+      Json(70.0),
+      Json(78.0),
+    ]),
   )
   // NIP-11 relay_countries: the two letter codes of the jurisdictions the
   // relay operates under, comma separated in RELAY_COUNTRIES.
@@ -48,15 +47,15 @@ pub fn nip11_doc(
   for country in countries.split(",") {
     let trimmed = country.to_string().trim(chars=" \t").to_string()
     if trimmed != "" {
-      country_list.push(trimmed.to_json())
+      country_list.push(Json(trimmed))
     }
   }
   if country_list.length() > 0 {
-    m.set("relay_countries", country_list.to_json())
+    m.set("relay_countries", Json(country_list))
   }
   let limitation : Map[String, Json] = {}
-  limitation.set("max_message_length", 1048576.0.to_json())
-  limitation.set("max_event_tags", 2000.0.to_json())
-  m.set("limitation", limitation.to_json())
-  m.to_json().stringify()
+  limitation.set("max_message_length", Json(1048576.0))
+  limitation.set("max_event_tags", Json(2000.0))
+  m.set("limitation", Json(limitation))
+  Json(m).stringify()
 }

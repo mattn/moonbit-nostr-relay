@@ -10,9 +10,11 @@ ENV PATH="/root/.moon/bin:${PATH}"
 
 WORKDIR /app
 
-# Fetch dependencies first so they cache independently of source changes
-COPY moon.mod .
-RUN moon update && moon install
+# Fetch dependencies first so they cache independently of source changes.
+# `moon install` no longer fetches project dependencies; checking the empty
+# root package downloads them into .mooncakes instead.
+COPY moon.mod moon.pkg ./
+RUN moon update && moon check --target native
 
 COPY . .
 RUN moon build --target native --release
