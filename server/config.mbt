@@ -5,6 +5,7 @@ pub(all) struct Config {
   port : Int
   max_events : Int
   verify_sigs : Bool // verify event ids and Schnorr signatures
+  min_pow_difficulty : Int // NIP-13 minimum leading zero bits of the id; 0 disables
   now : () -> UInt64 // wall clock in unix seconds (injectable for tests)
 }
 
@@ -21,6 +22,7 @@ pub fn default_config() -> Config {
     port: 8080,
     max_events: 100000,
     verify_sigs: true,
+    min_pow_difficulty: 0,
     now: unix_now,
   }
 }

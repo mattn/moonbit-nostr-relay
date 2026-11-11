@@ -26,11 +26,13 @@ pub fn eose(String) -> String
 
 pub fn event_msg(String, @event.Event) -> String
 
-pub fn nip11_doc(name? : String, description? : String, pubkey? : String, contact? : String, icon? : String) -> String
+pub fn nip11_doc(name? : String, description? : String, pubkey? : String, contact? : String, icon? : String, countries? : String, min_pow_difficulty? : Int) -> String
 
 pub fn notice(String) -> String
 
 pub fn ok_msg(String, Bool, String) -> String
+
+pub fn pow_difficulty(String) -> Int
 
 pub fn unix_now() -> UInt64
 
@@ -44,6 +46,7 @@ pub(all) struct Config {
   port : Int
   max_events : Int
   verify_sigs : Bool
+  min_pow_difficulty : Int
   now : () -> UInt64
 }
 

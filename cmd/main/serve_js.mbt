@@ -181,6 +181,6 @@ pub fn serve(config : @server.Config) -> Unit {
       conns.remove(id)
       relay.client_disconnected(id)
     },
-    @server.nip11_doc(),
+    @server.nip11_doc(min_pow_difficulty=config.min_pow_difficulty),
   )
 }

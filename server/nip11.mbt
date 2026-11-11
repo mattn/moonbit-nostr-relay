@@ -7,6 +7,7 @@ pub fn nip11_doc(
   contact? : String = "",
   icon? : String = "",
   countries? : String = "JP",
+  min_pow_difficulty? : Int = 0,
 ) -> String {
   let m : Map[String, Json] = {}
   m.set("name", Json(name))
@@ -29,6 +30,7 @@ pub fn nip11_doc(
       Json(4.0),
       Json(9.0),
       Json(11.0),
+      Json(13.0),
       Json(17.0),
       Json(26.0),
       Json(40.0),
@@ -56,6 +58,7 @@ pub fn nip11_doc(
   let limitation : Map[String, Json] = {}
   limitation.set("max_message_length", Json(1048576.0))
   limitation.set("max_event_tags", Json(2000.0))
+  limitation.set("min_pow_difficulty", Json(min_pow_difficulty.to_double()))
   m.set("limitation", Json(limitation))
   Json(m).stringify()
 }

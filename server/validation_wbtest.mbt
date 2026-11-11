@@ -226,6 +226,7 @@ test "delegated event through the relay" {
     port: 0,
     max_events: 100,
     verify_sigs: true,
+    min_pow_difficulty: 0,
     now: fn() { 1751234567 },
   }
   let relay = Relay::new(config, @storage.new_store(100))
@@ -278,4 +279,19 @@ test "delegated event through the relay" {
       #|[1 <- ["OK","ec5efc9d090ad7ac53f2685a95d8c4e0fc418122b47b431529cc25028739a5a7",false,"invalid: bad delegation signature"]]
     ),
   )
+}
+
+///|
+test "NIP-13 pow_difficulty" {
+  inspect(pow_difficulty("ffffffff"), content="0")
+  inspect(pow_difficulty("7fffffff"), content="1")
+  inspect(pow_difficulty("3fffffff"), content="2")
+  inspect(pow_difficulty("1fffffff"), content="3")
+  inspect(pow_difficulty("0fffffff"), content="4")
+  inspect(pow_difficulty("00ffffff"), content="8")
+  inspect(pow_difficulty("002fffff"), content="10")
+  inspect(pow_difficulty("000000000e9d897a3aa5f"), content="36")
+  inspect(pow_difficulty("0000000000000000"), content="64")
+  inspect(pow_difficulty(""), content="0")
+  inspect(pow_difficulty("00zz"), content="8")
 }
