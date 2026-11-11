@@ -72,6 +72,7 @@ All configuration is via environment variables:
 | `RELAY_PUBKEY` | (unset) | NIP-11 `pubkey` |
 | `RELAY_CONTACT` | (unset) | NIP-11 `contact` |
 | `RELAY_ICON` | (unset) | NIP-11 `icon` |
+| `MIN_POW_DIFFICULTY` | `0` | NIP-13 minimum proof of work (leading zero bits of the event id); `0` disables it |
 
 ## Features
 
@@ -89,6 +90,9 @@ All configuration is via environment variables:
 - **NIP-09**: event deletion — a kind-5 event deletes the events referenced
   by its `e` tags, but only those authored by the same pubkey; the deletion
   event itself is stored and served to clients
+- **NIP-13**: proof of work — with `MIN_POW_DIFFICULTY` set, events whose id
+  has fewer leading zero bits are rejected (advertised as NIP-11
+  `limitation.min_pow_difficulty`)
 - **NIP-22**: `created_at` limits — events stamped more than 15 minutes in
   the future or more than 3 years in the past are rejected
 - **NIP-26**: delegated event signing — `delegation` tags are validated
@@ -136,7 +140,7 @@ a `v*` tag publishes the corresponding semver tag.
 
 ## Not yet implemented
 
-- NIP-42 auth, rate limiting / PoW
+- NIP-42 auth, rate limiting
 - PostgreSQL on the JS backend (pgstore is native-only)
 
 ## License

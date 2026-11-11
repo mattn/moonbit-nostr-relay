@@ -210,6 +210,24 @@ fn Relay::handle_event(
       ]
     Ok(_) => ()
   }
+  // NIP-13: demand a minimum proof of work. Only the id is checked; whether
+  // a nonce tag commits to the same target is the publisher's business.
+  let min_pow = self.config.min_pow_difficulty
+  if min_pow > 0 {
+    let difficulty = pow_difficulty(ev.id)
+    if difficulty < min_pow {
+      return [
+        {
+          client_id,
+          message: ok_msg(
+            ev.id,
+            false,
+            "pow: difficulty \{difficulty} is less than \{min_pow}",
+          ),
+        },
+      ]
+    }
+  }
   // NIP-22: reject events whose created_at is outside the accepted window
   if !created_at_in_limits(ev.created_at, (self.config.now)()) {
     return [

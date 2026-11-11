@@ -215,3 +215,34 @@ fn parse_decimal(s : String) -> Int64? {
     Some(acc)
   }
 }
+
+///|
+/// NIP-13: proof of work difficulty, the number of leading zero bits of the
+/// hex event id. Counting stops at the first non-hex character.
+pub fn pow_difficulty(id : String) -> Int {
+  let mut bits = 0
+  for c in id {
+    let n = if c >= '0' && c <= '9' {
+      c.to_int() - '0'.to_int()
+    } else if c >= 'a' && c <= 'f' {
+      c.to_int() - 'a'.to_int() + 10
+    } else if c >= 'A' && c <= 'F' {
+      c.to_int() - 'A'.to_int() + 10
+    } else {
+      break
+    }
+    if n == 0 {
+      bits = bits + 4
+      continue
+    }
+    if n <= 1 {
+      bits = bits + 3
+    } else if n <= 3 {
+      bits = bits + 2
+    } else if n <= 7 {
+      bits = bits + 1
+    }
+    break
+  }
+  bits
+}

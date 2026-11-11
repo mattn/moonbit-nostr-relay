@@ -14,3 +14,13 @@ test "nip11 relay_countries" {
   let blanks = nip11_doc(countries=" , ")
   assert_false(blanks.contains("relay_countries"))
 }
+
+///|
+/// NIP-13: the configured minimum is advertised under limitation.
+test "nip11 min_pow_difficulty" {
+  assert_true(nip11_doc().contains("\"min_pow_difficulty\":0"))
+  assert_true(
+    nip11_doc(min_pow_difficulty=8).contains("\"min_pow_difficulty\":8"),
+  )
+  assert_true(nip11_doc().contains("11,13,17"))
+}

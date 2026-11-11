@@ -23,11 +23,23 @@ async fn main {
       }
     None => 8080
   }
+  // NIP-13: minimum proof of work (leading zero bits of the event id)
+  let min_pow_difficulty = match @env.get_env_var("MIN_POW_DIFFICULTY") {
+    Some(v) =>
+      @string.parse_int(v) catch {
+        _ => {
+          println("invalid MIN_POW_DIFFICULTY: \{v}")
+          return
+        }
+      }
+    None => 0
+  }
   let config : @server.Config = {
     host,
     port,
     max_events: 100000,
     verify_sigs: true,
+    min_pow_difficulty,
     now: @server.unix_now,
   }
   let store : &@storage.Storage = match @env.get_env_var("DATABASE_URL") {
@@ -55,6 +67,7 @@ async fn main {
     contact?=@env.get_env_var("RELAY_CONTACT"),
     icon?=@env.get_env_var("RELAY_ICON"),
     countries?=@env.get_env_var("RELAY_COUNTRIES"),
+    min_pow_difficulty~,
   )
   let relay = @server.Relay::new(config, store)
   // client id -> outgoing message queue, drained by a per-client writer task

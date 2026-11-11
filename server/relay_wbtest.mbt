@@ -7,6 +7,7 @@ fn test_config() -> Config {
     port: 0,
     max_events: 100,
     verify_sigs: false,
+    min_pow_difficulty: 0,
     now: fn() { 100000 },
   }
 }
@@ -644,6 +645,7 @@ test "signature verification with real crypto" {
     port: 0,
     max_events: 100,
     verify_sigs: true,
+    min_pow_difficulty: 0,
     now: fn() { 1751234567 },
   }
   let relay = Relay::new(config, @storage.new_store(100))
@@ -714,6 +716,37 @@ test "signature verification with real crypto" {
     dump(r3),
     content=(
       #|[1 <- ["OK","f53047b5bf7fd42b3096c1db2b497bac2c5ad55f00bdc96322c1637b9f6a0d92",false,"invalid: bad signature"]]
+    ),
+  )
+}
+
+///|
+test "NIP-13 minimum proof of work" {
+  let relay = Relay::new(
+    { ..test_config(), min_pow_difficulty: 8 },
+    @storage.new_store(100),
+  )
+  // 0xaa... has no leading zero bits
+  let weak = relay.handle_message(
+    "c1",
+    fake_event_json(fake_id1, fake_pk, 1000, 1, "[]", "weak"),
+  )
+  inspect(
+    dump(weak),
+    content=(
+      #|[c1 <- ["OK","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",false,"pow: difficulty 0 is less than 8"]]
+    ),
+  )
+  // 0x007f... has 9 leading zero bits
+  let strong_id = "007f" + head(fake_id2, 60)
+  let strong = relay.handle_message(
+    "c1",
+    fake_event_json(strong_id, fake_pk, 1001, 1, "[]", "strong"),
+  )
+  inspect(
+    dump(strong),
+    content=(
+      #|[c1 <- ["OK","007fcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",true,""]]
     ),
   )
 }
