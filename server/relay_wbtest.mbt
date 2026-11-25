@@ -537,12 +537,13 @@ test "NIP-40 expiration parsing" {
 }
 
 ///|
-test "NIP-40 expired events are stored but not served" {
-  let config : Config = { ..test_config(), now: fn() { 2000000 } }
+test "NIP-40 expired events are rejected and stored ones expire" {
+  let clock : Ref[UInt64] = Ref::new(2000000)
+  let config : Config = { ..test_config(), now: fn() { clock.val } }
   let relay = Relay::new(config, @storage.new_store(100))
   // Subscribe client 1 to everything
   let _ = relay.handle_message("1", "[\"REQ\",\"sub\",{}]")
-  // An already-expired event is accepted but not broadcast
+  // An already-expired event is rejected
   let r1 = relay.handle_message(
     "2",
     fake_event_json(
@@ -552,7 +553,7 @@ test "NIP-40 expired events are stored but not served" {
   inspect(
     dump(r1),
     content=(
-      #|[2 <- ["OK","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",true,""]]
+      #|[2 <- ["OK","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",false,"invalid: event has expired"]]
     ),
   )
   // A not-yet-expired event is broadcast normally
@@ -582,14 +583,28 @@ test "NIP-40 expired events are stored but not served" {
       #|[2 <- ["OK","66666666, 1 <- ["EVENT","sub",]
     ),
   )
-  // REQ serves the live and malformed-expiration events, not the expired
-  // one, although all three are stored
+  // An event that expires soon is accepted and broadcast
   let r4 = relay.handle_message(
+    "2",
+    fake_event_json(
+      "7777777777777777777777777777777777777777777777777777777777777777", fake_pk,
+      2000002, 1, "[[\"expiration\",\"2000100\"]]", "soon",
+    ),
+  )
+  inspect(
+    dump(r4).map(fn(s) { head(s, 20) }),
+    content=(
+      #|[2 <- ["OK","77777777, 1 <- ["EVENT","sub",]
+    ),
+  )
+  // Once it has expired, REQ no longer serves it although it is still stored
+  clock.val = 2000200
+  let r5 = relay.handle_message(
     "3",
     "[\"REQ\",\"q\",{\"authors\":[\"\{fake_pk}\"]}]",
   )
   inspect(
-    dump(r4).map(fn(s) { head(s, 26) }),
+    dump(r5).map(fn(s) { head(s, 26) }),
     content=(
       #|[3 <- ["EVENT","q",{"id":"6, 3 <- ["EVENT","q",{"id":"c, 3 <- ["EOSE","q"]]
     ),
