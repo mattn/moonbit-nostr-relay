@@ -254,6 +254,12 @@ fn Relay::handle_event(
       },
     ]
   }
+  // NIP-40: an event that has already expired is not accepted.
+  if ev.is_expired((self.config.now)()) {
+    return [
+      { client_id, message: ok_msg(ev.id, false, "invalid: event has expired") },
+    ]
+  }
   if @event.is_ephemeral_kind(ev.kind) {
     let out = [{ client_id, message: ok_msg(ev.id, true, "") }]
     out.append(self.broadcast(ev))
@@ -378,7 +384,7 @@ fn Relay::handle_req(
 
 ///|
 /// Deliver a fresh event to every matching subscription of every client.
-/// NIP-40: an already-expired event is accepted but never delivered.
+/// NIP-40: an already-expired event is never delivered.
 fn Relay::broadcast(self : Relay, ev : @event.Event) -> Array[Outgoing] {
   let out : Array[Outgoing] = []
   if ev.is_expired((self.config.now)()) {
