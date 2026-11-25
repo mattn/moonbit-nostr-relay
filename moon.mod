@@ -14,5 +14,5 @@ description = "A Nostr relay server implementation in MoonBit"
 
 import {
   "mattn/postgres@0.10.7",
-  "moonbitlang/async@0.20.1",
+  "moonbitlang/async@0.22.10",
 }
