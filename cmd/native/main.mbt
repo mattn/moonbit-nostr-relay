@@ -83,7 +83,7 @@ async fn main {
     if upgrade != "websocket" {
       let accept = request.headers.get("accept").unwrap_or("")
       if accept.contains("application/nostr+json") {
-        let headers : Map[String, String] = {
+        let headers : @http.Headers = {
           "Content-Type": "application/nostr+json",
           "Access-Control-Allow-Origin": "*",
         }
@@ -224,7 +224,7 @@ async fn serve_static(
       return
     }
   }
-  let headers : Map[String, String] = {
+  let headers : @http.Headers = {
     "Content-Type": content_type(path),
     "Cache-Control": "public, max-age=300",
   }
